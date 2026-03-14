@@ -74,10 +74,12 @@ export class OfflineStorage {
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['photos'], 'readonly');
       const store = transaction.objectStore('photos');
-      const index = store.index('synced');
-      const request = index.getAll(false);
+      const request = store.getAll();
 
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = () => {
+        const results = request.result || [];
+        resolve(results.filter(p => p.synced === false || p.synced === 0));
+      };
       request.onerror = () => reject(request.error);
     });
   }
