@@ -11,12 +11,15 @@ import {
   Mail, 
   Calendar, 
   Clock, 
-  DollarSign, 
   Users, 
   FileText, 
   Download,
-  Printer,
-  ExternalLink
+  ExternalLink,
+  Edit,
+  Trash2,
+  Plus,
+  ShoppingCart,
+  Upload
 } from "lucide-react";
 import Link from "next/link";
 
