@@ -3,23 +3,23 @@ import { useRouter } from "next/router";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
-  Users, 
   Briefcase, 
+  Users, 
   Calendar, 
-  FileText, 
-  ShoppingCart,
+  TrendingUp, 
+  UserCircle,
   BarChart3,
   Settings
 } from "lucide-react";
 
-const navItems = [
+const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Leads", href: "/leads", icon: Users },
+  { name: "Leads", href: "/leads", icon: TrendingUp },
   { name: "Jobs", href: "/jobs", icon: Briefcase },
+  { name: "Customers", href: "/customers", icon: Users },
+  { name: "Team", href: "/team", icon: UserCircle },
   { name: "Schedule", href: "/schedule", icon: Calendar },
-  { name: "Job Sheets", href: "/job-sheets", icon: FileText },
-  { name: "Purchases", href: "/purchases", icon: ShoppingCart },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
+  { name: "Reports", href: "/reports", icon: BarChart3 },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -34,7 +34,7 @@ export function Navigation() {
       </div>
 
       <ul className="space-y-2">
-        {navItems.map((item) => {
+        {navigation.map((item) => {
           const Icon = item.icon;
           const isActive = router.pathname === item.href;
           
