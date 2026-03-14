@@ -1,46 +1,84 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { cn } from "@/lib/utils";
-import { 
-  LayoutDashboard, 
-  Briefcase, 
-  Users, 
-  Calendar, 
-  TrendingUp, 
+import { useState, useEffect } from "react";
+import { getCurrentUserPermissions, getCurrentUserRole, UserPermissions, UserRole } from "@/services/roleService";
+import {
+  LayoutDashboard,
+  Briefcase,
+  Calendar,
+  Users,
   UserCircle,
-  BarChart3,
-  Settings,
-  PoundSterling,
   Package,
-  Building
+  PoundSterling,
+  Building,
+  ClipboardList,
+  Settings,
+  CalendarDays
 } from "lucide-react";
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Leads", href: "/leads", icon: TrendingUp },
-  { name: "Jobs", href: "/jobs", icon: Briefcase },
-  { name: "Customers", href: "/customers", icon: Users },
-  { name: "Team", href: "/team", icon: UserCircle },
-  { name: "Schedule", href: "/schedule", icon: Calendar },
-  { name: "Inventory", href: "/inventory", icon: Package },
-  { name: "Company Hub", href: "/company", icon: Building },
-  { name: "Pricing Guide", href: "/pricing", icon: PoundSterling },
-  { name: "Reports", href: "/reports", icon: BarChart3 },
-  { name: "Settings", href: "/settings", icon: Settings },
+const allNavItems = [
+  { name: "Dashboard", href: "/", icon: LayoutDashboard, permission: "view_dashboard" as keyof UserPermissions },
+  { name: "My Week", href: "/my-week", icon: CalendarDays, roles: ["builder", "site_manager"] },
+  { name: "Leads", href: "/leads", icon: ClipboardList, permission: "view_leads" as keyof UserPermissions },
+  { name: "Jobs", href: "/jobs", icon: Briefcase, permission: "view_jobs" as keyof UserPermissions },
+  { name: "Customers", href: "/customers", icon: UserCircle, permission: "view_customers" as keyof UserPermissions },
+  { name: "Team", href: "/team", icon: Users, permission: "view_team" as keyof UserPermissions },
+  { name: "Schedule", href: "/schedule", icon: Calendar, permission: "view_schedule" as keyof UserPermissions },
+  { name: "Inventory", href: "/inventory", icon: Package, permission: "view_inventory" as keyof UserPermissions },
+  { name: "Pricing", href: "/pricing", icon: PoundSterling, permission: "view_pricing" as keyof UserPermissions },
+  { name: "Company", href: "/company", icon: Building, permission: "view_company" as keyof UserPermissions },
+  { name: "Reports", href: "/reports", icon: ClipboardList, permission: "view_reports" as keyof UserPermissions },
+  { name: "Settings", href: "/settings", icon: Settings, permission: "view_settings" as keyof UserPermissions },
 ];
 
 export function Navigation() {
   const router = useRouter();
+  const [navItems, setNavItems] = useState(allNavItems);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+
+  useEffect(() => {
+    async function filterNavigation() {
+      const permissions = await getCurrentUserPermissions();
+      const role = await getCurrentUserRole();
+      setUserRole(role);
+
+      if (!permissions) {
+        setNavItems([]);
+        return;
+      }
+
+      const filtered = allNavItems.filter(item => {
+        // Check role-specific items (like My Week for builders)
+        if (item.roles) {
+          return role && item.roles.includes(role);
+        }
+        // Check permission-based items
+        if (item.permission) {
+          return permissions[item.permission];
+        }
+        return true;
+      });
+
+      setNavItems(filtered);
+    }
+
+    filterNavigation();
+  }, []);
 
   return (
-    <nav className="w-64 bg-primary text-white flex-shrink-0 hidden lg:block">
-      <div className="h-full flex flex-col">
-        <div className="h-16 flex items-center px-6 border-b border-white/10">
-          <h1 className="text-xl font-heading font-bold">Harding Homes</h1>
-        </div>
-
-        <ul className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
+    <nav className="bg-white border-r border-gray-200 w-64 min-h-screen p-4">
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-blue-900">Harding Homes</h2>
+        {userRole && (
+          <p className="text-xs text-gray-500 mt-1 capitalize">
+            {userRole.replace("_", " ")} Portal
+          </p>
+        )}
+      </div>
+      <div className="space-y-1">
+        <ul className="space-y-1">
+          {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = router.pathname === item.href;
             
@@ -49,14 +87,14 @@ export function Navigation() {
                 <Link
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
                     isActive
-                      ? "bg-white/10 text-white"
-                      : "text-gray-300 hover:bg-white/5 hover:text-white"
+                      ? "bg-blue-900 text-white"
+                      : "text-gray-700 hover:bg-gray-100"
                   )}
                 >
-                  <Icon className="w-5 h-5 flex-shrink-0" />
-                  {item.name}
+                  <Icon className="w-5 h-5" />
+                  <span className="font-medium">{item.name}</span>
                 </Link>
               </li>
             );

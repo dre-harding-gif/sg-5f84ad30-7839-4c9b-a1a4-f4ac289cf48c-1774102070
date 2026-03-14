@@ -291,6 +291,8 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          permissions: Json | null
+          role: string | null
           updated_at: string | null
         }
         Insert: {
@@ -299,6 +301,8 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          permissions?: Json | null
+          role?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -307,13 +311,38 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          permissions?: Json | null
+          role?: string | null
           updated_at?: string | null
         }
         Relationships: []
       }
     }
     Views: {
-      [_ in never]: never
+      user_permissions: {
+        Row: {
+          email: string | null
+          full_name: string | null
+          id: string | null
+          permissions: Json | null
+          role: string | null
+        }
+        Insert: {
+          email?: string | null
+          full_name?: string | null
+          id?: string | null
+          permissions?: never
+          role?: string | null
+        }
+        Update: {
+          email?: string | null
+          full_name?: string | null
+          id?: string | null
+          permissions?: never
+          role?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

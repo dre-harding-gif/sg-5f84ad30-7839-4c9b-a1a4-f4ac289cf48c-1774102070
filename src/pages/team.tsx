@@ -1,138 +1,199 @@
-import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { SEO } from "@/components/SEO";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Users, Phone, Mail, MapPin } from "lucide-react";
-import type { TeamMember } from "@/types";
-
-const mockTeamMembers: TeamMember[] = [
-  {
-    id: "1",
-    name: "John Smith",
-    role: "Lead Builder",
-    email: "john.smith@hardinghomes.com",
-    phone: "07123 456789",
-    skills: ["Carpentry", "Project Management", "Masonry"],
-    availability: "on-job",
-  },
-  {
-    id: "2",
-    name: "Mike Johnson",
-    role: "Electrician",
-    email: "mike.j@hardinghomes.com",
-    phone: "07987 654321",
-    skills: ["Electrical", "Testing", "Certification"],
-    availability: "available",
-  },
-  {
-    id: "3",
-    name: "Sarah Williams",
-    role: "Plumber",
-    email: "sarah.w@hardinghomes.com",
-    phone: "07456 789123",
-    skills: ["Plumbing", "Heating", "Gas Safe"],
-    availability: "on-job",
-  },
-  {
-    id: "4",
-    name: "David Brown",
-    role: "General Builder",
-    email: "david.b@hardinghomes.com",
-    phone: "07789 123456",
-    skills: ["Bricklaying", "Plastering", "Tiling"],
-    availability: "available",
-  },
-];
-
-const availabilityColors = {
-  available: "bg-green-100 text-green-800",
-  "on-job": "bg-orange-100 text-orange-800",
-  off: "bg-gray-100 text-gray-800",
-};
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Phone, Mail, MapPin, Calendar, Wrench, Crown, Briefcase, HardHat, User } from "lucide-react";
+import { useState, useEffect } from "react";
+import { getCurrentUserRole, updateUserRole, UserRole } from "@/services/roleService";
 
 export default function TeamPage() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
+  const [teamMembers, setTeamMembers] = useState([
+    {
+      id: "1",
+      name: "John Smith",
+      role: "site_manager" as UserRole,
+      email: "john.smith@hardinghomes.com",
+      phone: "07700 900123",
+      specialization: "Extensions & Conversions",
+      status: "active",
+      currentJobs: 3,
+      joinDate: "2019-03-15",
+      address: "Reading, Berkshire"
+    },
+    {
+      id: "2",
+      name: "Mike Johnson",
+      role: "builder" as UserRole,
+      email: "mike.j@hardinghomes.com",
+      phone: "07700 900456",
+      specialization: "Bricklaying",
+      status: "active",
+      currentJobs: 2,
+      joinDate: "2020-06-01",
+      address: "Henley-on-Thames"
+    },
+    {
+      id: "3",
+      name: "Sarah Williams",
+      role: "office_manager" as UserRole,
+      email: "sarah.w@hardinghomes.com",
+      phone: "07700 900789",
+      specialization: "Project Coordination",
+      status: "active",
+      currentJobs: 12,
+      joinDate: "2018-09-10",
+      address: "Reading, Berkshire"
+    },
+    {
+      id: "4",
+      name: "Tom Davies",
+      role: "builder" as UserRole,
+      email: "tom.d@hardinghomes.com",
+      phone: "07700 900321",
+      specialization: "Carpentry & Joinery",
+      status: "active",
+      currentJobs: 1,
+      joinDate: "2021-01-20",
+      address: "Caversham"
+    }
+  ]);
+
+  useEffect(() => {
+    async function fetchUserRole() {
+      const role = await getCurrentUserRole();
+      setCurrentUserRole(role);
+    }
+    fetchUserRole();
+  }, []);
+
+  const getRoleIcon = (role: UserRole) => {
+    switch (role) {
+      case "owner": return <Crown className="h-4 w-4" />;
+      case "office_manager": return <Briefcase className="h-4 w-4" />;
+      case "site_manager": return <HardHat className="h-4 w-4" />;
+      case "builder": return <Wrench className="h-4 w-4" />;
+      default: return <User className="h-4 w-4" />;
+    }
+  };
+
+  const getRoleBadgeColor = (role: UserRole) => {
+    switch (role) {
+      case "owner": return "bg-purple-100 text-purple-800";
+      case "office_manager": return "bg-blue-100 text-blue-800";
+      case "site_manager": return "bg-green-100 text-green-800";
+      case "builder": return "bg-orange-100 text-orange-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const handleRoleChange = async (memberId: string, newRole: UserRole) => {
+    const success = await updateUserRole(memberId, newRole);
+    if (success) {
+      setTeamMembers(prev =>
+        prev.map(member =>
+          member.id === memberId ? { ...member, role: newRole } : member
+        )
+      );
+    }
+  };
+
+  const canEditRoles = currentUserRole === "owner";
 
   return (
     <DashboardLayout>
-      <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
+      <SEO title="Team Management" description="Manage your team members and their roles" />
+      
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-heading font-bold text-foreground">Team</h1>
-            <p className="text-muted-foreground mt-1">Manage your workforce and assignments</p>
+            <h1 className="text-3xl font-bold text-gray-900">Team</h1>
+            <p className="text-gray-600 mt-2">Manage team members and their access levels</p>
           </div>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Team Member
-          </Button>
+          <Button>Add Team Member</Button>
         </div>
 
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search team members..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Button variant="outline">
-                <Filter className="mr-2 h-4 w-4" />
-                Filter
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockTeamMembers.map((member) => (
-            <Card key={member.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Users className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">{member.name}</h3>
-                      <p className="text-sm text-muted-foreground">{member.role}</p>
-                    </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          {teamMembers.map((member) => (
+            <Card key={member.id}>
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle>{member.name}</CardTitle>
+                    <CardDescription className="mt-1 flex items-center gap-2">
+                      {getRoleIcon(member.role)}
+                      <span className="capitalize">{member.role.replace("_", " ")}</span>
+                    </CardDescription>
                   </div>
-                  <Badge className={availabilityColors[member.availability]}>
-                    {member.availability.replace("-", " ")}
+                  <Badge className={getRoleBadgeColor(member.role)}>
+                    {member.status}
                   </Badge>
                 </div>
-
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Mail className="h-4 w-4" />
-                    <span className="truncate">{member.email}</span>
+                    {member.email}
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Phone className="h-4 w-4" />
-                    <span>{member.phone}</span>
+                    {member.phone}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <MapPin className="h-4 w-4" />
+                    {member.address}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Wrench className="h-4 w-4" />
+                    {member.specialization}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Calendar className="h-4 w-4" />
+                    Joined {new Date(member.joinDate).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
                   </div>
                 </div>
 
-                <div className="mb-4">
-                  <p className="text-xs text-muted-foreground mb-2">Skills</p>
-                  <div className="flex flex-wrap gap-1">
-                    {member.skills.map((skill) => (
-                      <Badge key={skill} variant="secondary" className="text-xs">
-                        {skill}
-                      </Badge>
-                    ))}
+                <div className="pt-4 border-t space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Current Jobs:</span>
+                    <Badge variant="outline">{member.currentJobs}</Badge>
                   </div>
-                </div>
 
-                <Button variant="outline" className="w-full" size="sm">
-                  View Schedule
-                </Button>
+                  {canEditRoles && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Access Level:</label>
+                      <Select
+                        value={member.role}
+                        onValueChange={(value) => handleRoleChange(member.id, value as UserRole)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="owner">Owner (Full Access)</SelectItem>
+                          <SelectItem value="office_manager">Office Manager</SelectItem>
+                          <SelectItem value="site_manager">Site Manager</SelectItem>
+                          <SelectItem value="builder">Builder/Tradesperson</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        {member.role === "owner" && "Full system access including settings and billing"}
+                        {member.role === "office_manager" && "Can manage jobs, schedule, customers, and view reports"}
+                        {member.role === "site_manager" && "Can manage jobs, schedule, team, and inventory"}
+                        {member.role === "builder" && "Can view assigned jobs and check inventory"}
+                      </p>
+                    </div>
+                  )}
+
+                  {!canEditRoles && (
+                    <p className="text-xs text-gray-500 italic">
+                      Only owners can modify team member roles
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
