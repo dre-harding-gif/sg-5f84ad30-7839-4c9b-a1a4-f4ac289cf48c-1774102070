@@ -52,9 +52,10 @@ export default function JobDetailPage() {
       { id: "2", name: "Mike Johnson", role: "Electrician" },
     ],
     materials: [
-      { id: "1", name: "Bi-fold doors (3m)", quantity: 1, unit: "set", supplier: "Window World" },
-      { id: "2", name: "Floor tiles", quantity: 25, unit: "sqm", supplier: "Tile Direct" },
-      { id: "3", name: "Kitchen units", quantity: 12, unit: "units", supplier: "IKEA" },
+      { id: "1", name: "Bi-fold doors (3m)", quantity: 1, unit: "set", supplier: "Window World", inStock: false },
+      { id: "2", name: "Floor tiles", quantity: 25, unit: "sqm", supplier: "Tile Direct", inStock: false },
+      { id: "3", name: "Plasterboard (12.5mm)", quantity: 12, unit: "boards", supplier: "In Stock (Unit 1)", inStock: true, stockLocation: "Unit 1 - B1" },
+      { id: "4", name: "Copper Pipe (15mm)", quantity: 5, unit: "lengths", supplier: "In Stock (Unit 2)", inStock: true, stockLocation: "Unit 2 - Rack 3" },
     ],
     purchaseOrders: [
       {
@@ -331,14 +332,30 @@ export default function JobDetailPage() {
                   {job.materials.map((material) => (
                     <div key={material.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex-1">
-                        <p className="font-medium">{material.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {material.quantity} {material.unit} {material.supplier && `• ${material.supplier}`}
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{material.name}</p>
+                          {material.inStock && (
+                            <Badge className="bg-green-100 text-green-800 border-green-200">
+                              In Stock
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {material.quantity} {material.unit} 
+                          {material.supplier && !material.inStock && ` • Order from: ${material.supplier}`}
+                          {material.inStock && ` • Location: ${material.stockLocation}`}
                         </p>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {!material.inStock ? (
+                          <Badge variant="outline" className="text-orange-600 border-orange-200">Needs Order</Badge>
+                        ) : (
+                          <Button variant="ghost" size="sm" className="text-blue-600">Take from Stock</Button>
+                        )}
+                        <Button variant="ghost" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>

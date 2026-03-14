@@ -9,7 +9,10 @@ import {
   TrendingUp, 
   UserCircle,
   BarChart3,
-  Settings
+  Settings,
+  PoundSterling,
+  Package,
+  Building
 } from "lucide-react";
 
 const navigation = [
@@ -19,6 +22,9 @@ const navigation = [
   { name: "Customers", href: "/customers", icon: Users },
   { name: "Team", href: "/team", icon: UserCircle },
   { name: "Schedule", href: "/schedule", icon: Calendar },
+  { name: "Inventory", href: "/inventory", icon: Package },
+  { name: "Company Hub", href: "/company", icon: Building },
+  { name: "Pricing Guide", href: "/pricing", icon: PoundSterling },
   { name: "Reports", href: "/reports", icon: BarChart3 },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
