@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layout } from "@/components/Layout";
+import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +56,7 @@ export default function TeamPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   return (
-    <Layout>
+    <DashboardLayout>
       <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -138,6 +138,6 @@ export default function TeamPage() {
           ))}
         </div>
       </div>
-    </Layout>
+    </DashboardLayout>
   );
 }

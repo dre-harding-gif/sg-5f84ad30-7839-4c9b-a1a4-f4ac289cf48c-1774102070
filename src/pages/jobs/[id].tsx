@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { Layout } from "@/components/Layout";
+import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   MapPin, Calendar, Users, Clock, FileText, Image, 
   ShoppingCart, CheckCircle, ExternalLink, Phone, Mail,
-  Download, Upload, Edit, Trash2
+  Download, Upload, Edit, Trash2, Plus
 } from "lucide-react";
 import Link from "next/link";
 
@@ -112,7 +112,7 @@ export default function JobDetailPage() {
   };
 
   return (
-    <Layout>
+    <DashboardLayout>
       <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="mb-8">
           <div className="flex items-start justify-between">
@@ -437,6 +437,6 @@ export default function JobDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    </DashboardLayout>
   );
 }

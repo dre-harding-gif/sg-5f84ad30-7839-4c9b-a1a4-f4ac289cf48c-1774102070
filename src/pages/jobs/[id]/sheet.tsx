@@ -1,8 +1,8 @@
 import { useRouter } from "next/router";
-import { Layout } from "@/components/Layout";
+import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Download, Print, MapPin, Calendar, Users, Phone, Mail } from "lucide-react";
+import { Download, Printer, MapPin, Calendar, Users, Phone, Mail } from "lucide-react";
 
 export default function JobSheetPage() {
   const router = useRouter();
@@ -49,13 +49,13 @@ export default function JobSheetPage() {
   };
 
   return (
-    <Layout>
+    <DashboardLayout>
       <div className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
         <div className="mb-6 flex items-center justify-between print:hidden">
           <h1 className="text-2xl font-heading font-bold">Job Sheet</h1>
           <div className="flex gap-2">
             <Button variant="outline" onClick={handlePrint}>
-              <Print className="mr-2 h-4 w-4" />
+              <Printer className="mr-2 h-4 w-4" />
               Print
             </Button>
             <Button variant="outline">
@@ -215,6 +215,6 @@ export default function JobSheetPage() {
           }
         }
       `}</style>
-    </Layout>
+    </DashboardLayout>
   );
 }

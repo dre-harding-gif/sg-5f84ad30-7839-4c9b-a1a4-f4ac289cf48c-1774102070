@@ -3,85 +3,35 @@ export interface Customer {
   name: string;
   email: string;
   phone: string;
-  address: string;
-  postcode: string;
-  source: "checkatrade" | "direct" | "referral" | "other";
-  createdAt: Date;
-  portalAccess?: {
-    username: string;
-    lastLogin?: Date;
-  };
+  address?: string;
+  postcode?: string;
+  companyName?: string;
+  portalAccess?: boolean;
+  createdAt?: Date;
+  totalJobs?: number;
+  activeJobs?: number;
 }
 
 export interface Job {
   id: string;
   jobNumber: string;
   customerId: string;
-  customer?: Customer;
+  customerName?: string;
   title: string;
-  description: string;
+  description?: string;
   address: string;
-  postcode: string;
+  postcode?: string;
   status: "lead" | "quoted" | "scheduled" | "in-progress" | "completed" | "on-hold";
-  priority: "low" | "medium" | "high" | "urgent";
+  priority?: "low" | "medium" | "high" | "urgent";
   startDate?: Date;
   endDate?: Date;
-  estimatedHours: number;
-  actualHours: number;
-  assignedTeam: string[];
-  materials: Material[];
-  purchaseOrders: PurchaseOrder[];
-  documents: Document[];
-  photos: Photo[];
+  estimatedHours?: number;
+  actualHours?: number;
+  estimatedValue?: number;
+  actualValue?: number;
+  assignedTeam?: TeamMember[];
   createdAt: Date;
-  updatedAt: Date;
-  warranty?: {
-    years: number;
-    documents: string[];
-  };
-}
-
-export interface Material {
-  id: string;
-  name: string;
-  quantity: number;
-  unit: string;
-  supplier?: string;
-  notes?: string;
-}
-
-export interface PurchaseOrder {
-  id: string;
-  poNumber: string;
-  jobId: string;
-  supplier: string;
-  items: {
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-  }[];
-  totalAmount: number;
-  dateOrdered: Date;
-  dateReceived?: Date;
-  status: "ordered" | "received" | "cancelled";
-}
-
-export interface Document {
-  id: string;
-  name: string;
-  type: "job-sheet" | "plan" | "specification" | "warranty" | "other";
-  url: string;
-  uploadedAt: Date;
-  uploadedBy: string;
-}
-
-export interface Photo {
-  id: string;
-  url: string;
-  caption?: string;
-  stage: "before" | "during" | "after";
-  uploadedAt: Date;
+  updatedAt?: Date;
 }
 
 export interface TeamMember {
@@ -90,31 +40,93 @@ export interface TeamMember {
   role: string;
   email: string;
   phone: string;
-  avatar?: string;
-  skills: string[];
+  skills?: string[];
   availability: "available" | "on-job" | "off";
+  currentJobId?: string;
 }
 
-export interface TimeEntry {
+export interface Lead {
+  id: string;
+  source: string;
+  customerName: string;
+  email: string;
+  phone: string;
+  address?: string;
+  postcode?: string;
+  projectType?: string;
+  description?: string;
+  estimatedValue?: number;
+  status: "new" | "contacted" | "quoted" | "converted" | "lost";
+  priority?: "low" | "medium" | "high";
+  createdAt: Date;
+  followUpDate?: Date;
+  notes?: string;
+}
+
+export interface Material {
+  id: string;
+  jobId: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  supplier?: string;
+  cost?: number;
+  ordered?: boolean;
+  received?: boolean;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  poNumber: string;
+  jobId: string;
+  supplier: string;
+  items: Material[];
+  totalAmount: number;
+  dateOrdered: Date;
+  expectedDelivery?: Date;
+  status: "ordered" | "received" | "cancelled";
+  invoiceNumber?: string;
+}
+
+export interface Document {
+  id: string;
+  jobId: string;
+  name: string;
+  type: "plan" | "specification" | "certificate" | "photo" | "invoice" | "other";
+  url: string;
+  uploadedBy: string;
+  uploadedAt: Date;
+  size?: number;
+}
+
+export interface TimeLog {
   id: string;
   jobId: string;
   teamMemberId: string;
+  teamMemberName?: string;
   date: Date;
   hours: number;
-  description?: string;
-  approved: boolean;
+  task?: string;
+  notes?: string;
 }
 
-export interface JobProgress {
+export interface CustomerPortalUser {
+  id: string;
+  customerId: string;
+  email: string;
+  hashedPassword: string;
+  lastLogin?: Date;
+  activeJobIds: string[];
+}
+
+export interface ProgressUpdate {
+  id: string;
   jobId: string;
+  date: Date;
   percentage: number;
-  milestones: {
-    id: string;
-    title: string;
-    completed: boolean;
-    completedAt?: Date;
-  }[];
-  lastUpdate: Date;
+  message: string;
+  photos?: string[];
+  createdBy: string;
 }
 
 export interface CustomerConcern {
@@ -122,9 +134,9 @@ export interface CustomerConcern {
   jobId: string;
   customerId: string;
   subject: string;
-  message: string;
-  status: "open" | "resolved";
+  description: string;
   createdAt: Date;
+  status: "open" | "resolved";
   resolvedAt?: Date;
   response?: string;
 }
