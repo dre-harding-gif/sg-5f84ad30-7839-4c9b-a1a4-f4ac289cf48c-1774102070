@@ -1,31 +1,27 @@
 import { Bell, Menu, Search, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 export function Header() {
   return (
-    <header className="bg-card border-b border-border sticky top-0 z-10">
-      <div className="flex items-center justify-between px-6 py-4">
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="px-4 lg:px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" className="lg:hidden">
             <Menu className="w-5 h-5" />
           </Button>
-          
-          <div className="relative hidden md:block">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search jobs, customers..." 
-              className="pl-10 w-64 lg:w-96"
-            />
-          </div>
+          <h1 className="text-xl font-heading font-bold text-primary hidden lg:block">
+            Harding Homes
+          </h1>
         </div>
 
         <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon">
+            <Search className="w-5 h-5" />
+          </Button>
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full"></span>
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full"></span>
           </Button>
-          
           <Button variant="ghost" size="icon">
             <User className="w-5 h-5" />
           </Button>
