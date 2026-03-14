@@ -1,13 +1,22 @@
 import { useRouter } from "next/router";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { 
-  MapPin, Calendar, Users, Clock, FileText, Image, 
-  ShoppingCart, CheckCircle, ExternalLink, Phone, Mail,
-  Download, Upload, Edit, Trash2, Plus
+  MapPin, 
+  Phone, 
+  Mail, 
+  Calendar, 
+  Clock, 
+  DollarSign, 
+  Users, 
+  FileText, 
+  Download,
+  Printer,
+  ExternalLink
 } from "lucide-react";
 import Link from "next/link";
 
@@ -417,18 +426,14 @@ export default function JobDetailPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {job.photos.map((photo) => (
-                    <div key={photo.id} className="border rounded-lg overflow-hidden">
-                      <div className="aspect-video bg-gray-200 flex items-center justify-center">
-                        <Image className="h-12 w-12 text-gray-400" />
-                      </div>
-                      <div className="p-2">
-                        <p className="text-sm font-medium">{photo.caption}</p>
-                        <Badge variant="outline" className="text-xs mt-1">
-                          {photo.stage}
-                        </Badge>
-                      </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                      <img 
+                        src={`https://images.unsplash.com/photo-${1580000000000 + i}?w=400&h=400&fit=crop`} 
+                        alt={`Job site photo ${i}`}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                   ))}
                 </div>

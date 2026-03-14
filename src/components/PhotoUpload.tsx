@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +34,7 @@ export function PhotoUpload({ jobId, onPhotoAdded }: PhotoUploadProps) {
     if (isOnline && 'serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.ready;
       if ('sync' in registration) {
-        await registration.sync.register('sync-photos');
+        await (registration as ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } }).sync.register('sync-photos');
       }
     }
     
