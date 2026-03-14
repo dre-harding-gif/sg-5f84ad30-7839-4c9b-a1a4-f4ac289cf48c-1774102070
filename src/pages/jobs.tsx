@@ -23,11 +23,10 @@ const mockJobs: Job[] = [
     startDate: new Date("2026-03-01"),
     estimatedHours: 120,
     actualHours: 65,
-    assignedTeam: ["John Smith", "Mike Johnson"],
-    materials: [],
-    purchaseOrders: [],
-    documents: [],
-    photos: [],
+    assignedTeam: [
+      { id: "1", name: "John Smith", role: "Lead Builder", email: "john@example.com", phone: "07123456789", availability: "on-job" },
+      { id: "2", name: "Mike Johnson", role: "Electrician", email: "mike@example.com", phone: "07987654321", availability: "on-job" },
+    ],
     createdAt: new Date("2026-02-15"),
     updatedAt: new Date(),
   },
@@ -44,11 +43,9 @@ const mockJobs: Job[] = [
     startDate: new Date("2026-03-18"),
     estimatedHours: 80,
     actualHours: 0,
-    assignedTeam: ["Sarah Williams"],
-    materials: [],
-    purchaseOrders: [],
-    documents: [],
-    photos: [],
+    assignedTeam: [
+      { id: "3", name: "Sarah Williams", role: "Plumber", email: "sarah@example.com", phone: "07456123789", availability: "available" },
+    ],
     createdAt: new Date("2026-03-05"),
     updatedAt: new Date(),
   },
@@ -65,10 +62,6 @@ const mockJobs: Job[] = [
     estimatedHours: 200,
     actualHours: 0,
     assignedTeam: [],
-    materials: [],
-    purchaseOrders: [],
-    documents: [],
-    photos: [],
     createdAt: new Date("2026-03-10"),
     updatedAt: new Date(),
   },
@@ -186,7 +179,7 @@ export default function JobsPage() {
                       <div>
                         <p className="text-xs text-muted-foreground">Team</p>
                         <p className="font-medium text-sm">
-                          {job.assignedTeam.length > 0 ? `${job.assignedTeam.length} members` : "Unassigned"}
+                          {job.assignedTeam && job.assignedTeam.length > 0 ? `${job.assignedTeam.length} members` : "Unassigned"}
                         </p>
                       </div>
                     </div>

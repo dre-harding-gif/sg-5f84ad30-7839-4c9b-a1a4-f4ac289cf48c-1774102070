@@ -6,7 +6,11 @@ export interface Customer {
   address?: string;
   postcode?: string;
   companyName?: string;
-  portalAccess?: boolean;
+  source?: string;
+  portalAccess?: {
+    username: string;
+    lastLogin?: Date;
+  };
   createdAt?: Date;
   totalJobs?: number;
   activeJobs?: number;
@@ -30,6 +34,10 @@ export interface Job {
   estimatedValue?: number;
   actualValue?: number;
   assignedTeam?: TeamMember[];
+  materials?: Material[];
+  purchaseOrders?: PurchaseOrder[];
+  documents?: Document[];
+  photos?: { id: string; url: string; caption: string; stage: string }[];
   createdAt: Date;
   updatedAt?: Date;
 }

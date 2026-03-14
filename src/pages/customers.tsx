@@ -101,9 +101,11 @@ export default function CustomersPage() {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="text-lg font-semibold mb-1">{customer.name}</h3>
-                    <Badge variant="outline" className={sourceColors[customer.source]}>
-                      {customer.source}
-                    </Badge>
+                    {customer.source && (
+                      <Badge variant="outline" className={sourceColors[customer.source as keyof typeof sourceColors] || sourceColors.other}>
+                        {customer.source}
+                      </Badge>
+                    )}
                   </div>
                   {customer.portalAccess && (
                     <Badge variant="secondary">Portal Access</Badge>
