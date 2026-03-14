@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Header } from "@/components/Header";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -18,6 +19,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </main>
       </div>
+      <OfflineIndicator />
     </div>
   );
 }

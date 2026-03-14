@@ -37,7 +37,7 @@ export async function getCurrentUserPermissions(): Promise<UserPermissions | nul
       .single();
 
     if (error) throw error;
-    return data.permissions as UserPermissions;
+    return data.permissions as unknown as UserPermissions;
   } catch (error) {
     console.error("Error fetching user permissions:", error);
     return null;
