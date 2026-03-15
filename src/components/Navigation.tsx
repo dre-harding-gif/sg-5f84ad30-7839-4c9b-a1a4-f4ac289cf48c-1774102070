@@ -51,7 +51,7 @@ function NavigationContent({ onItemClick }: { onItemClick?: () => void }) {
           
           return (
             <Link 
-              key={item.name} 
+              key={item.label} 
               href={item.href}
               onClick={onItemClick}
               className={cn(
@@ -63,7 +63,7 @@ function NavigationContent({ onItemClick }: { onItemClick?: () => void }) {
               )}
             >
               <Icon className="h-5 w-5 flex-shrink-0" />
-              <span className="font-medium">{item.name}</span>
+              <span className="font-medium">{item.label}</span>
             </Link>
           );
         })}

@@ -230,7 +230,9 @@ export async function getUserPermissions(userId?: string): Promise<UserPermissio
     const basePermissions = rolePermissions[role] || rolePermissions.builder;
     
     // Merge role permissions with any custom permissions
-    const customPermissions = data.permissions || {};
+    const customPermissions = (typeof data.permissions === 'object' && data.permissions !== null && !Array.isArray(data.permissions)) 
+      ? data.permissions 
+      : {};
     
     return {
       role,
