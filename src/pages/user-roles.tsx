@@ -14,12 +14,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Users, Mail, Calendar } from "lucide-react";
+import { Shield, Users, Mail, Calendar, Filter } from "lucide-react";
 
 const roles: UserRole[] = ["owner", "office_manager", "site_manager", "builder", "customer"];
 
 export default function UserRolesPage() {
   const [users, setUsers] = useState<Tables<"profiles">[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<Tables<"profiles">[]>([]);
+  const [selectedRole, setSelectedRole] = useState<UserRole | "all">("all");
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const { toast } = useToast();
@@ -28,11 +30,28 @@ export default function UserRolesPage() {
     loadUsers();
   }, []);
 
+  useEffect(() => {
+    filterUsers();
+  }, [users, selectedRole]);
+
   async function loadUsers() {
     setLoading(true);
     const data = await getAllUsers();
     setUsers(data);
     setLoading(false);
+  }
+
+  function filterUsers() {
+    if (selectedRole === "all") {
+      setFilteredUsers(users);
+    } else {
+      setFilteredUsers(users.filter(user => user.role === selectedRole));
+    }
+  }
+
+  function getRoleCount(role: UserRole | "all"): number {
+    if (role === "all") return users.length;
+    return users.filter(user => user.role === role).length;
   }
 
   async function handleRoleChange(userId: string, newRole: UserRole) {
@@ -113,25 +132,87 @@ export default function UserRolesPage() {
             </CardContent>
           </Card>
 
+          {/* Role Filters */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filter by Role
+              </CardTitle>
+              <CardDescription>
+                Click a role to filter the user list
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={selectedRole === "all" ? "default" : "outline"}
+                  onClick={() => setSelectedRole("all")}
+                  className="gap-2"
+                >
+                  All Users
+                  <Badge variant="secondary" className="ml-1">
+                    {getRoleCount("all")}
+                  </Badge>
+                </Button>
+                {roles.map((role) => (
+                  <Button
+                    key={role}
+                    variant={selectedRole === role ? "default" : "outline"}
+                    onClick={() => setSelectedRole(role)}
+                    className="gap-2"
+                  >
+                    {getRoleDisplayName(role)}
+                    <Badge variant="secondary" className="ml-1">
+                      {getRoleCount(role)}
+                    </Badge>
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Users List */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Team Members ({users.length})
+                {selectedRole === "all" 
+                  ? `All Team Members (${filteredUsers.length})`
+                  : `${getRoleDisplayName(selectedRole as UserRole)} (${filteredUsers.length})`
+                }
               </CardTitle>
               <CardDescription>
-                Assign and manage user roles
+                {selectedRole === "all" 
+                  ? "Showing all users - filter by role above"
+                  : `Showing users with role: ${getRoleDisplayName(selectedRole as UserRole)}`
+                }
               </CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <p className="text-center py-8 text-muted-foreground">Loading users...</p>
-              ) : users.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">No users found</p>
+              ) : filteredUsers.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    {selectedRole === "all" 
+                      ? "No users found"
+                      : `No users with role: ${getRoleDisplayName(selectedRole as UserRole)}`
+                    }
+                  </p>
+                  {selectedRole !== "all" && (
+                    <Button
+                      variant="link"
+                      onClick={() => setSelectedRole("all")}
+                      className="mt-2"
+                    >
+                      View all users
+                    </Button>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-4">
-                  {users.map((user) => (
+                  {filteredUsers.map((user) => (
                     <div 
                       key={user.id} 
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
