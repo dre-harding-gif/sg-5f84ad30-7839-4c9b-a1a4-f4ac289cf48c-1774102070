@@ -22,12 +22,16 @@ import {
   Clock,
   User,
   CheckCircle2,
-  Plus
+  Plus,
+  MapPinned,
+  Calendar,
+  Upload
 } from "lucide-react";
 import Link from "next/link";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { MapLauncher } from "@/components/MapLauncher";
 import { supabase } from "@/integrations/supabase/client";
+import { PhotoLightbox } from "@/components/PhotoLightbox";
 
 interface PurchaseOrder {
   id: string;
@@ -55,8 +59,10 @@ export default function JobDetailPage() {
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
   const [newPO, setNewPO] = useState({ supplier: "", items: "", amount: "" });
   const [newTimeLog, setNewTimeLog] = useState({ staff: "", hours: "", task: "" });
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
-  const job = {
+  const [job, setJob] = useState({
     id: id as string,
     jobNumber: "JOB-2024-001",
     title: "Kitchen Extension",
@@ -83,11 +89,13 @@ export default function JobDetailPage() {
       { name: "Plasterboard (12.5mm)", quantity: 24, unit: "sheets", inStock: true, location: "Unit 1 - B1" },
       { name: "Timber Joists (4x2)", quantity: 12, unit: "lengths", inStock: true, location: "Unit 1 - A3" },
       { name: "Insulation Rolls", quantity: 8, unit: "rolls", inStock: false }
-    ]
-  };
+    ],
+    photos: [] as any[]
+  });
 
   useEffect(() => {
     if (id) {
+      setJob(prev => ({ ...prev, id: id as string }));
       fetchPurchaseOrders();
       fetchTimeLogs();
     }
@@ -218,6 +226,23 @@ export default function JobDetailPage() {
 
   const totalSpent = purchaseOrders.reduce((sum, po) => sum + po.total_amount, 0);
   const totalHours = timeLogs.reduce((sum, log) => sum + log.hours_worked, 0);
+
+  const handlePhotoClick = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
+  const handleDeletePhoto = async (photoId: string) => {
+    // In a real implementation, this would delete from Supabase Storage
+    console.log("Deleting photo:", photoId);
+    // Update local state to remove the photo
+    if (job) {
+      setJob({
+        ...job,
+        photos: job.photos.filter(p => p.id !== photoId)
+      });
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -549,6 +574,45 @@ export default function JobDetailPage() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              <TabsContent value="photos">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Job Photos</CardTitle>
+                      <PhotoUpload jobId={id as string} />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {job.photos && job.photos.length > 0 ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {job.photos.map((photo, index) => (
+                          <div 
+                            key={photo.id} 
+                            className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => handlePhotoClick(index)}
+                          >
+                            <img
+                              src={photo.url}
+                              alt={photo.caption || `Job photo ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            {photo.caption && (
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-2">
+                                {photo.caption}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground text-center py-8">
+                        No photos uploaded yet. Click "Upload Photos" to add images.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
           </div>
 
@@ -586,6 +650,18 @@ export default function JobDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Photo Lightbox */}
+      {job && job.photos && (
+        <PhotoLightbox
+          photos={job.photos}
+          initialIndex={lightboxIndex}
+          isOpen={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+          onDelete={handleDeletePhoto}
+          canDelete={true}
+        />
+      )}
     </DashboardLayout>
   );
 }
