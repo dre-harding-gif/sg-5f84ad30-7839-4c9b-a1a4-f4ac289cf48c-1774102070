@@ -177,15 +177,16 @@ export async function sendNotification(
 ) {
   try {
     // Get customer details
-    const { data: customer } = await supabase
+    const { data } = await supabase
       .from("customers" as any)
       .select("name, email, phone")
       .eq("id", customerId)
       .single();
 
+    const customer = data as any;
     if (!customer) throw new Error("Customer not found");
 
-    const template = notificationTemplates[templateKey];
+    const template = notificationTemplates[templateKey] as any;
     const results = { email: false, sms: false };
 
     // Replace variables in message
@@ -263,12 +264,13 @@ export async function sendCustomNotification(
   subject?: string
 ) {
   try {
-    const { data: customer } = await supabase
+    const { data } = await supabase
       .from("customers" as any)
       .select("name, email, phone")
       .eq("id", customerId)
       .single();
 
+    const customer = data as any;
     if (!customer) throw new Error("Customer not found");
 
     if (type === "email") {
