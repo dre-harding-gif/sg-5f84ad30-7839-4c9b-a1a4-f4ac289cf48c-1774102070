@@ -244,7 +244,7 @@ export default function Dashboard() {
   };
 
   const calculateTeamPerformance = (jobs: any[], team: any[]) => {
-    const teamData: { [key: string]: { completed: number, active: number, hours: number } } = {};
+    const teamData: { [key: string]: { name: string, completed: number, active: number, hours: number } } = {};
 
     team.forEach(member => {
       teamData[member.id] = { 
@@ -824,7 +824,7 @@ export default function Dashboard() {
                         cx="50%"
                         cy="50%"
                         labelLine={true}
-                        label={(entry) => `${entry.category}: £${entry.value.toLocaleString()}`}
+                        label={(entry: any) => `${entry.category}: £${entry.value.toLocaleString()}`}
                         outerRadius={100}
                         fill="#8884d8"
                         dataKey="value"
