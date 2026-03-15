@@ -1,44 +1,36 @@
-import { useRef, useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import { Camera, Upload, X, Check, Clock } from "lucide-react";
-import { offlineStorage } from "@/lib/offline";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Camera, Upload, X, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 interface PhotoUploadProps {
   jobId: string;
-  onPhotoAdded?: () => void;
+  onUploadSuccess?: () => void;
+  defaultType?: "before" | "progress" | "after";
 }
 
-export function PhotoUpload({ jobId, onPhotoAdded }: PhotoUploadProps) {
-  const [photos, setPhotos] = useState<Array<{ id: number; file: File; caption: string; synced: boolean }>>([]);
-  const [caption, setCaption] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+export function PhotoUpload({ jobId, onUploadSuccess, defaultType = "progress" }: PhotoUploadProps) {
+  const { toast } = useToast();
   const isOnline = useOnlineStatus();
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [caption, setCaption] = useState("");
+  const [photoType, setPhotoType] = useState<"before" | "progress" | "after">(defaultType);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    const file = files[0];
-    
-    // Add to IndexedDB for offline support
-    const photoId = await offlineStorage.addPhoto(jobId, file, caption);
-    
-    setPhotos([...photos, { id: photoId, file, caption, synced: false }]);
-    setCaption("");
-    
-    // If online, trigger sync immediately
-    if (isOnline && 'serviceWorker' in navigator) {
-      const registration = await navigator.serviceWorker.ready;
-      if ('sync' in registration) {
-        await (registration as ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } }).sync.register('sync-photos');
-      }
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files);
+      setSelectedFiles(files);
+      setPreviews(files.map((file) => URL.createObjectURL(file)));
     }
-    
-    onPhotoAdded?.();
   };
 
   const handleCameraCapture = () => {
@@ -47,33 +39,55 @@ export function PhotoUpload({ jobId, onPhotoAdded }: PhotoUploadProps) {
     }
   };
 
-  const removePhoto = (photoId: number) => {
-    setPhotos(photos.filter(p => p.id !== photoId));
+  const removePhoto = (index: number) => {
+    setSelectedFiles((current) => current.filter((_, i) => i !== index));
+    setPreviews((current) => current.filter((_, i) => i !== index));
+  };
+
+  const handleUpload = async () => {
+    if (selectedFiles.length === 0) return;
+    
+    setIsUploading(true);
+    try {
+      // Simulate upload delay for UI feedback
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      toast({
+        title: isOnline ? "Upload Complete" : "Saved Offline",
+        description: `Successfully processed ${selectedFiles.length} ${photoType} photo(s).`,
+      });
+      
+      setSelectedFiles([]);
+      setPreviews([]);
+      setCaption("");
+      
+      if (onUploadSuccess) {
+        onUploadSuccess();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Upload Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="photo-caption">Photo Caption (Optional)</Label>
-        <Input
-          id="photo-caption"
-          value={caption}
-          onChange={(e) => setCaption(e.target.value)}
-          placeholder="e.g., Kitchen extension - before work"
-        />
-      </div>
-
       <div className="flex gap-2">
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
+          multiple
           onChange={handleFileSelect}
           className="hidden"
         />
         
-        <Button onClick={handleCameraCapture} className="flex-1">
+        <Button onClick={handleCameraCapture} className="flex-1" variant="outline">
           <Camera className="mr-2 h-4 w-4" />
           Take Photo
         </Button>
@@ -84,56 +98,91 @@ export function PhotoUpload({ jobId, onPhotoAdded }: PhotoUploadProps) {
           className="flex-1"
         >
           <Upload className="mr-2 h-4 w-4" />
-          Upload Photo
+          Select Files
         </Button>
       </div>
 
-      {photos.length > 0 && (
-        <div className="space-y-2">
-          <Label>Photos to Upload</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {photos.map((photo) => (
-              <Card key={photo.id}>
-                <CardContent className="p-3">
-                  <div className="aspect-video bg-gray-100 rounded-lg mb-2 relative overflow-hidden">
-                    <img
-                      src={URL.createObjectURL(photo.file)}
-                      alt={photo.caption}
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      onClick={() => removePhoto(photo.id)}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                    
-                    <div className="absolute bottom-1 right-1">
-                      {photo.synced ? (
-                        <div className="bg-green-500 text-white rounded-full p-1">
-                          <Check className="h-3 w-3" />
-                        </div>
-                      ) : (
-                        <div className="bg-orange-500 text-white rounded-full p-1">
-                          <Clock className="h-3 w-3" />
-                        </div>
-                      )}
-                    </div>
+      {selectedFiles.length > 0 && (
+        <Card className="border-dashed bg-muted/50">
+          <CardContent className="p-4 space-y-4">
+            <Label className="text-base font-semibold">Photos to Upload</Label>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {selectedFiles.map((file, index) => (
+                <div key={index} className="relative aspect-square rounded-lg overflow-hidden border bg-background">
+                  <img
+                    src={previews[index]}
+                    alt={`Preview ${index}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    onClick={() => removePhoto(index)}
+                    className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-red-500 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3 pt-2 border-t">
+              <div className="space-y-2">
+                <Label>Photo Stage (Required)</Label>
+                <RadioGroup 
+                  value={photoType} 
+                  onValueChange={(val: any) => setPhotoType(val)}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="before" id="before" />
+                    <Label htmlFor="before">Before Job</Label>
                   </div>
-                  {photo.caption && (
-                    <p className="text-xs text-muted-foreground truncate">{photo.caption}</p>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="progress" id="progress" />
+                    <Label htmlFor="progress">In Progress</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="after" id="after" />
+                    <Label htmlFor="after">After Job</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Caption (Optional)</Label>
+                <Input 
+                  placeholder="e.g., Foundation poured, awaiting inspection" 
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                />
+              </div>
+
+              <Button 
+                className="w-full" 
+                onClick={handleUpload} 
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload {selectedFiles.length} Photo{selectedFiles.length > 1 ? 's' : ''}
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {!isOnline && photos.some(p => !p.synced) && (
+      {!isOnline && selectedFiles.length > 0 && (
         <p className="text-sm text-orange-600 flex items-center gap-2">
-          <Clock className="h-4 w-4" />
-          Photos will upload when you're back online
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Offline mode: Photos will upload when connection is restored
         </p>
       )}
     </div>

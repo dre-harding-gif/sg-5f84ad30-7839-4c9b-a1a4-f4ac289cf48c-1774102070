@@ -162,7 +162,7 @@ export function QuoteGenerator({ customerId, jobId, onQuoteSaved }: QuoteGenerat
           customer_name: quoteData.customer_name,
           customer_email: quoteData.customer_email,
           customer_address: quoteData.customer_address,
-          line_items: lineItems,
+          line_items: lineItems as any,
           subtotal: calculateSubtotal(),
           discount_percent: quoteData.discount_percent,
           discount_amount: calculateDiscount(),
