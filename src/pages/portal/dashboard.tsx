@@ -93,11 +93,11 @@ export default function CustomerPortal() {
   const loadCustomerJobs = async (customerId: string) => {
     try {
       // Load jobs first - bypass type checking completely
-      const jobsResponse: any = await supabase
+      const jobsResponse = (await supabase
         .from("jobs")
         .select("*")
         .eq("customer_id", customerId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })) as any;
 
       if (jobsResponse.error) throw jobsResponse.error;
 
@@ -107,17 +107,17 @@ export default function CustomerPortal() {
         const jobIds = jobsData.map((j: any) => j.id);
 
         // Load photos for these jobs
-        const photosResponse: any = await supabase
+        const photosResponse = (await supabase
           .from("job_photos")
           .select("*")
-          .in("job_id", jobIds);
+          .in("job_id", jobIds)) as any;
         const photosData = photosResponse.data;
 
         // Load quotes for these jobs
-        const quotesResponse: any = await supabase
+        const quotesResponse = (await supabase
           .from("quotes")
           .select("*")
-          .in("job_id", jobIds);
+          .in("job_id", jobIds)) as any;
         const quotesData = quotesResponse.data;
 
         const formattedJobs = jobsData.map((job: any) => ({
