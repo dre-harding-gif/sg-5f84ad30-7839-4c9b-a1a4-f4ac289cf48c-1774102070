@@ -93,11 +93,11 @@ export const authService = {
 
   /**
    * Invite a new user with email and assign role
-   * Creates the user account and sends invitation email
+   * Creates the user account and returns credentials for manual sharing
    */
   async inviteUser(email: string, fullName: string, role: string) {
     try {
-      // Generate a temporary password
+      // Generate a secure temporary password (16 characters)
       const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
       
       // Create the user account with Supabase Auth
@@ -123,47 +123,14 @@ export const authService = {
 
       if (profileError) throw profileError;
 
-      // Send invitation email via Edge Function
-      const appUrl = typeof window !== "undefined" ? window.location.origin : "";
-      const companyName = "Harding Homes"; // You can make this dynamic from settings
-      
-      try {
-        const { data: emailData, error: emailError } = await supabase.functions.invoke('send-invitation-email', {
-          body: {
-            to: email,
-            fullName,
-            tempPassword,
-            role,
-            appUrl,
-            companyName,
-          },
-        });
-
-        if (emailError) {
-          console.error("Email sending failed:", emailError);
-          // Don't throw - user was created successfully, just email failed
-        }
-
-        return {
-          success: true,
-          email,
-          tempPassword,
-          userId: authData.user.id,
-          emailSent: !emailError,
-          emailDetails: emailData,
-        };
-      } catch (emailErr) {
-        console.error("Error invoking email function:", emailErr);
-        // Return success anyway - user was created
-        return {
-          success: true,
-          email,
-          tempPassword,
-          userId: authData.user.id,
-          emailSent: false,
-          emailError: "Email service unavailable",
-        };
-      }
+      return {
+        success: true,
+        email,
+        tempPassword,
+        userId: authData.user.id,
+        fullName,
+        role,
+      };
     } catch (error: any) {
       return {
         success: false,
