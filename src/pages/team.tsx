@@ -92,38 +92,53 @@ export default function TeamPage() {
     }
 
     setInviting(true);
-    const result = await authService.inviteUser(inviteForm.email, inviteForm.fullName, inviteForm.role);
-    setInviting(false);
+    
+    try {
+      // Call the Edge Function to create the user
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: {
+          email: inviteForm.email,
+          fullName: inviteForm.fullName,
+          role: inviteForm.role
+        }
+      });
 
-    if (result.success && result.tempPassword) {
-      // Show success dialog with credentials
-      setInvitedCredentials({
-        email: inviteForm.email,
-        password: result.tempPassword
-      });
-      setSuccessDialogOpen(true);
-      setInviteDialogOpen(false);
-      
-      // Reset form
-      setInviteForm({
-        email: "",
-        fullName: "",
-        role: "builder"
-      });
-      
-      // Refresh team list
-      fetchTeamMembers();
-      
-      toast({
-        title: "User Invited Successfully",
-        description: "Share the credentials with the new team member"
-      });
-    } else {
+      if (error) throw error;
+
+      if (data.success && data.tempPassword) {
+        // Show success dialog with credentials
+        setInvitedCredentials({
+          email: inviteForm.email,
+          password: data.tempPassword
+        });
+        setSuccessDialogOpen(true);
+        setInviteDialogOpen(false);
+        
+        // Reset form
+        setInviteForm({
+          email: "",
+          fullName: "",
+          role: "builder"
+        });
+        
+        // Refresh team list
+        fetchTeamMembers();
+        
+        toast({
+          title: "User Invited Successfully",
+          description: "Share the credentials with the new team member"
+        });
+      } else {
+        throw new Error(data.error || "Failed to create user account");
+      }
+    } catch (error: any) {
       toast({
         title: "Invitation Failed",
-        description: result.error || "Failed to create user account",
+        description: error.message || "Failed to create user account",
         variant: "destructive"
       });
+    } finally {
+      setInviting(false);
     }
   }
 
