@@ -92,19 +92,30 @@ export default function CustomerPortal() {
 
   const loadCustomerJobs = async (customerId: string) => {
     try {
-      const { data } = await supabase
-        .from("jobs" as any)
-        .select(`
-          *,
-          job_photos(*),
-          quotes(*)
-        `)
+      // Load jobs first
+      const { data: jobsData, error: jobsError } = await supabase
+        .from("jobs")
+        .select("*")
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
 
-      const jobsData = data as any[];
+      if (jobsError) throw jobsError;
 
-      if (jobsData) {
+      if (jobsData && jobsData.length > 0) {
+        const jobIds = jobsData.map(j => j.id);
+
+        // Load photos for these jobs
+        const { data: photosData } = await supabase
+          .from("job_photos")
+          .select("*")
+          .in("job_id", jobIds);
+
+        // Load quotes for these jobs
+        const { data: quotesData } = await supabase
+          .from("quotes")
+          .select("*")
+          .in("job_id", jobIds);
+
         const formattedJobs = jobsData.map(job => ({
           id: job.id,
           job_number: job.job_number || `JOB-${job.id.slice(0, 8)}`,
@@ -115,10 +126,10 @@ export default function CustomerPortal() {
           address: job.address || "No address",
           team_members: job.assigned_team || [],
           materials: job.materials || [],
-          photos: job.job_photos || [],
+          photos: photosData?.filter(p => p.job_id === job.id) || [],
           documents: [],
           messages: [],
-          estimated_cost: job.quotes?.[0]?.total || 0
+          estimated_cost: quotesData?.find(q => q.job_id === job.id)?.total || job.estimated_cost || 0
         }));
 
         setJobs(formattedJobs);
