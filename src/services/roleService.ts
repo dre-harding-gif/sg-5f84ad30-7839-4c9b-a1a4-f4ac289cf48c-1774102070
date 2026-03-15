@@ -37,7 +37,7 @@ export async function getUserPermissions(): Promise<UserPermissions> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return defaultPermissions;
 
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("user_permissions")
       .select("*")
       .eq("user_id", session.user.id)
