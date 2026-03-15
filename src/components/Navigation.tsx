@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { 
   LayoutDashboard, Users, Briefcase, Calendar, 
   FileText, Settings, TrendingUp, Building, 
   Package, Clock, DollarSign
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -28,7 +28,7 @@ interface NavigationProps {
   onMobileClose?: () => void;
 }
 
-function NavigationContent() {
+function NavigationContent({ onItemClick }: { onItemClick?: () => void }) {
   const router = useRouter();
 
   return (
@@ -49,14 +49,20 @@ function NavigationContent() {
           const Icon = item.icon;
           
           return (
-            <Link key={item.name} href={item.href}>
-              <Button
-                variant={isActive ? "default" : "ghost"}
-                className="w-full justify-start gap-3"
-              >
-                <Icon className="h-5 w-5" />
-                <span className="font-medium">{item.name}</span>
-              </Button>
+            <Link 
+              key={item.name} 
+              href={item.href}
+              onClick={onItemClick}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                "hover:bg-accent hover:text-accent-foreground",
+                isActive 
+                  ? "bg-primary text-primary-foreground font-medium" 
+                  : "text-muted-foreground"
+              )}
+            >
+              <Icon className="h-5 w-5 flex-shrink-0" />
+              <span className="font-medium">{item.name}</span>
             </Link>
           );
         })}
@@ -86,7 +92,7 @@ export function Navigation({ mobileOpen, onMobileClose }: NavigationProps) {
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation Menu</SheetTitle>
           </SheetHeader>
-          <NavigationContent />
+          <NavigationContent onItemClick={onMobileClose} />
         </SheetContent>
       </Sheet>
     </>
