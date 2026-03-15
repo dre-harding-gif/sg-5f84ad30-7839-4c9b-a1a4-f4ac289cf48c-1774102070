@@ -93,29 +93,34 @@ export default function CustomerPortal() {
   const loadCustomerJobs = async (customerId: string) => {
     try {
       // Load jobs first
-      const { data: jobsData, error: jobsError } = await (supabase
+      const jobsResponse = await supabase
         .from("jobs")
         .select("*")
         .eq("customer_id", customerId)
-        .order("created_at", { ascending: false }) as any);
+        .order("created_at", { ascending: false });
+
+      const jobsData = jobsResponse.data as any;
+      const jobsError = jobsResponse.error;
 
       if (jobsError) throw jobsError;
 
       if (jobsData && jobsData.length > 0) {
-        const jobsList = jobsData as any[];
+        const jobsList: any[] = Array.isArray(jobsData) ? jobsData : [];
         const jobIds = jobsList.map((j: any) => j.id);
 
         // Load photos for these jobs
-        const { data: photosData } = await (supabase
+        const photosResponse = await supabase
           .from("job_photos")
           .select("*")
-          .in("job_id", jobIds) as any);
+          .in("job_id", jobIds);
+        const photosData = photosResponse.data as any;
 
         // Load quotes for these jobs
-        const { data: quotesData } = await (supabase
+        const quotesResponse = await supabase
           .from("quotes")
           .select("*")
-          .in("job_id", jobIds) as any);
+          .in("job_id", jobIds);
+        const quotesData = quotesResponse.data as any;
 
         const formattedJobs = jobsList.map((job: any) => ({
           id: job.id,
