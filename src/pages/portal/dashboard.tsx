@@ -17,6 +17,7 @@ import {
 import { format } from "date-fns";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import { MapLauncher } from "@/components/MapLauncher";
+import Image from "next/image";
 
 interface CustomerJob {
   id: string;
@@ -231,19 +232,27 @@ export default function CustomerPortal() {
       <SEO title="Customer Portal - Harding Homes" />
       
       {/* Header */}
-      <header className="border-b bg-card">
+      <header className="border-b bg-gradient-brand text-white shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Harding Homes</h1>
-              <p className="text-sm text-muted-foreground">Customer Portal</p>
+            <div className="flex items-center gap-4">
+              <Image 
+                src="/harding-homes-logo.svg" 
+                alt="Harding Homes" 
+                width={160} 
+                height={40}
+                className="h-10 w-auto"
+              />
+              <div className="hidden md:block">
+                <p className="text-sm text-blue-100">Customer Portal</p>
+              </div>
             </div>
             <div className="flex items-center gap-4">
-              <div className="text-right">
+              <div className="text-right hidden sm:block">
                 <p className="font-medium">{customer?.name}</p>
-                <p className="text-sm text-muted-foreground">{customer?.email}</p>
+                <p className="text-sm text-blue-100">{customer?.email}</p>
               </div>
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
+              <Button variant="outline" size="sm" onClick={handleSignOut} className="bg-white/10 border-white/20 text-white hover:bg-white/20">
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign Out
               </Button>

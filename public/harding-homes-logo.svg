@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 80" fill="none">
+  <!-- Harding Homes Logo -->
+  <rect x="10" y="15" width="20" height="50" fill="#1e3a8a" rx="2"/>
+  <rect x="35" y="25" width="20" height="40" fill="#2563eb" rx="2"/>
+  <rect x="60" y="15" width="20" height="50" fill="#1e3a8a" rx="2"/>
+  <path d="M15 40 H 75" stroke="#2563eb" stroke-width="4"/>
+  
+  <!-- Text -->
+  <text x="95" y="45" font-family="Arial, sans-serif" font-weight="700" font-size="28" fill="#1e3a8a">HARDING</text>
+  <text x="95" y="65" font-family="Arial, sans-serif" font-weight="400" font-size="20" fill="#2563eb">HOMES</text>
+</svg>

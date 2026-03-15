@@ -1,98 +1,66 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { cn } from "@/lib/utils";
-import { getUserPermissions, type UserRole, type UserPermissions } from "@/services/roleService";
+import { Button } from "@/components/ui/button";
 import { 
-  LayoutDashboard, 
-  Briefcase, 
-  Users, 
-  Calendar, 
-  Settings,
-  Package,
-  Building,
-  CalendarDays,
-  ClipboardList,
-  UserCircle,
-  PoundSterling,
-  FileText
+  LayoutDashboard, Users, Briefcase, Calendar, 
+  FileText, Settings, TrendingUp, Building, 
+  Package, Clock, DollarSign
 } from "lucide-react";
-import { useEffect, useState } from "react";
 
-const allNavItems = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard, permission: "view_dashboard" as keyof UserPermissions },
-  { name: "My Week", href: "/my-week", icon: CalendarDays, roles: ["builder", "site_manager"] },
-  { name: "Leads", href: "/leads", icon: ClipboardList, permission: "view_leads" as keyof UserPermissions },
-  { name: "Jobs", href: "/jobs", icon: Briefcase, permission: "view_jobs" as keyof UserPermissions },
-  { name: "Customers", href: "/customers", icon: UserCircle, permission: "view_customers" as keyof UserPermissions },
-  { name: "Team", href: "/team", icon: Users, permission: "view_team" as keyof UserPermissions },
-  { name: "Schedule", href: "/schedule", icon: Calendar, permission: "view_schedule" as keyof UserPermissions },
-  { name: "Inventory", href: "/inventory", icon: Package, permission: "view_inventory" as keyof UserPermissions },
-  { name: "Pricing", href: "/pricing", icon: PoundSterling, permission: "view_pricing" as keyof UserPermissions },
-  { name: "Company", href: "/company", icon: Building, permission: "view_company" as keyof UserPermissions },
-  { name: "Reports", href: "/reports", icon: FileText, permission: "view_reports" as keyof UserPermissions },
+const navigation = [
+  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Leads", href: "/leads", icon: TrendingUp },
+  { name: "Jobs", href: "/jobs", icon: Briefcase },
+  { name: "Customers", href: "/customers", icon: Users },
+  { name: "Schedule", href: "/schedule", icon: Calendar },
+  { name: "Team", href: "/team", icon: Users },
+  { name: "My Week", href: "/my-week", icon: Clock },
+  { name: "Inventory", href: "/inventory", icon: Package },
+  { name: "Company", href: "/company", icon: Building },
+  { name: "Reports", href: "/reports", icon: FileText },
+  { name: "Pricing", href: "/pricing", icon: DollarSign },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function Navigation() {
   const router = useRouter();
-  const [navItems, setNavItems] = useState(allNavItems);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
-
-  useEffect(() => {
-    async function filterNavigation() {
-      const permissions = await getUserPermissions();
-      setUserRole(permissions.role);
-
-      const filtered = allNavItems.filter(item => {
-        if (item.roles) {
-          return permissions.role && item.roles.includes(permissions.role);
-        }
-        if (item.permission) {
-          return permissions[item.permission as keyof UserPermissions] === true;
-        }
-        return true;
-      });
-
-      setNavItems(filtered);
-    }
-
-    filterNavigation();
-  }, []);
 
   return (
-    <nav className="bg-white border-r border-gray-200 w-64 min-h-screen p-4">
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-blue-900">Harding Homes</h2>
-        {userRole && (
-          <p className="text-xs text-gray-500 mt-1 capitalize">
-            {userRole.replace("_", " ")} Portal
+    <nav className="w-64 bg-secondary text-white flex-shrink-0 border-r border-white/10">
+      <div className="p-4 space-y-1">
+        <div className="mb-6 pb-4 border-b border-white/10">
+          <p className="text-xs font-semibold text-white/60 uppercase tracking-wider">
+            Main Menu
           </p>
-        )}
+        </div>
+        
+        {navigation.map((item) => {
+          const isActive = router.pathname === item.href;
+          const Icon = item.icon;
+          
+          return (
+            <Link key={item.name} href={item.href}>
+              <Button
+                variant={isActive ? "secondary" : "ghost"}
+                className={`w-full justify-start gap-3 ${
+                  isActive 
+                    ? "bg-primary text-white hover:bg-primary/90" 
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="font-medium">{item.name}</span>
+              </Button>
+            </Link>
+          );
+        })}
       </div>
-      <div className="space-y-1">
-        <ul className="space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = router.pathname === item.href;
-            
-            return (
-              <li key={item.name}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
-                    isActive
-                      ? "bg-blue-900 text-white"
-                      : "text-gray-700 hover:bg-gray-100"
-                  )}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-medium">{item.name}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+      
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10 bg-secondary">
+        <div className="text-xs text-white/60 text-center">
+          <p className="font-semibold text-white mb-1">Harding Homes Ltd</p>
+          <p>Building Excellence Since 2010</p>
+        </div>
       </div>
     </nav>
   );

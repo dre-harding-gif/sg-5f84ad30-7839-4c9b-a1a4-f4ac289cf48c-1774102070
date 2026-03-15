@@ -25,16 +25,8 @@ export default function Dashboard() {
   const [monthlyGrowth, setMonthlyGrowth] = useState(0);
 
   useEffect(() => {
-    checkAuth();
     loadDashboardData();
   }, []);
-
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      router.push("/portal/login");
-    }
-  };
 
   const loadDashboardData = async () => {
     try {

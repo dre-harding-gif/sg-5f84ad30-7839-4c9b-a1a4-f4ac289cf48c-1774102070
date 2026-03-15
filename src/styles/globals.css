@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,42 +6,73 @@
 
 @layer base {
   :root {
+    /* Harding Homes Brand Colors */
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --foreground: 222 84% 15%;
     
-    --primary: 221 83% 23%;
-    --primary-foreground: 210 40% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 84% 15%;
     
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 84% 15%;
     
-    --accent: 28 80% 52%;
+    /* Primary: Harding Blue */
+    --primary: 217 91% 33%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Secondary: Professional Navy */
+    --secondary: 222 84% 15%;
+    --secondary-foreground: 0 0% 100%;
+    
+    /* Accent: Bright Blue */
+    --accent: 217 91% 60%;
     --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
     
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
     
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 221 83% 23%;
-    
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --ring: 217 91% 33%;
     
     --radius: 0.5rem;
+
+    /* Custom Harding Homes Gradients */
+    --gradient-brand: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+    --gradient-hero: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+  }
+
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 0 0% 95%;
     
-    --success: 142 76% 36%;
-    --warning: 38 92% 50%;
-    --info: 199 89% 48%;
+    --card: 222 47% 11%;
+    --card-foreground: 0 0% 95%;
     
-    --gradient-hero: linear-gradient(135deg, hsl(221 83% 23%) 0%, hsl(221 83% 33%) 100%);
-    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --popover: 222 47% 11%;
+    --popover-foreground: 0 0% 95%;
+    
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+    
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 0 0% 95%;
+    
+    --accent: 217 33% 17%;
+    --accent-foreground: 0 0% 95%;
+    
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 95%;
+    
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 217 91% 60%;
   }
 }
 
@@ -49,22 +80,24 @@
   * {
     @apply border-border;
   }
-  
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-  }
-  
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-heading;
+    @apply bg-background text-foreground font-sans;
   }
 }
 
 @layer utilities {
+  .bg-gradient-brand {
+    background: var(--gradient-brand);
+  }
+  
   .bg-gradient-hero {
     background: var(--gradient-hero);
   }
   
-  .shadow-card {
-    box-shadow: var(--shadow-card);
+  .text-gradient-brand {
+    background: var(--gradient-brand);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }
