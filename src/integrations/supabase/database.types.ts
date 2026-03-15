@@ -290,6 +290,132 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          amount_paid: number | null
+          created_at: string | null
+          created_by: string | null
+          due_date: string | null
+          id: string
+          invoice_number: string
+          job_id: string | null
+          paid_date: string | null
+          payment_method: string | null
+          payment_status: string | null
+          quote_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount_paid?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number: string
+          job_id?: string | null
+          paid_date?: string | null
+          payment_method?: string | null
+          payment_status?: string | null
+          quote_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount_paid?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: string
+          job_id?: string | null
+          paid_date?: string | null
+          payment_method?: string | null
+          payment_status?: string | null
+          quote_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_photos: {
+        Row: {
+          caption: string | null
+          id: string
+          job_id: string
+          photo_type: string
+          photo_url: string
+          uploaded_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          caption?: string | null
+          id?: string
+          job_id: string
+          photo_type: string
+          photo_url: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          caption?: string | null
+          id?: string
+          job_id?: string
+          photo_type?: string
+          photo_url?: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_photos_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_photos_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_photos_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           actual_hours: number | null
@@ -466,6 +592,70 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string | null
+          customer_id: string | null
+          id: string
+          job_id: string | null
+          message: string
+          recipient: string
+          sent_at: string | null
+          status: string | null
+          subject: string | null
+          trigger_event: string
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          job_id?: string | null
+          message: string
+          recipient: string
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+          trigger_event: string
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          job_id?: string | null
+          message?: string
+          recipient?: string
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+          trigger_event?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_guide: {
         Row: {
           category: string
@@ -516,6 +706,7 @@ export type Database = {
           full_name: string | null
           id: string
           permissions: Json | null
+          phone: string | null
           role: string | null
           updated_at: string | null
         }
@@ -526,6 +717,7 @@ export type Database = {
           full_name?: string | null
           id: string
           permissions?: Json | null
+          phone?: string | null
           role?: string | null
           updated_at?: string | null
         }
@@ -536,6 +728,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           permissions?: Json | null
+          phone?: string | null
           role?: string | null
           updated_at?: string | null
         }
@@ -601,6 +794,105 @@ export type Database = {
           },
           {
             foreignKeyName: "purchase_orders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          customer_address: string | null
+          customer_email: string
+          customer_id: string | null
+          customer_name: string
+          discount_amount: number | null
+          discount_percent: number | null
+          id: string
+          job_id: string | null
+          line_items: Json
+          notes: string | null
+          quote_number: string
+          status: string | null
+          subtotal: number
+          total: number
+          updated_at: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          customer_address?: string | null
+          customer_email: string
+          customer_id?: string | null
+          customer_name: string
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          job_id?: string | null
+          line_items?: Json
+          notes?: string | null
+          quote_number: string
+          status?: string | null
+          subtotal?: number
+          total: number
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          customer_address?: string | null
+          customer_email?: string
+          customer_id?: string | null
+          customer_name?: string
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          job_id?: string | null
+          line_items?: Json
+          notes?: string | null
+          quote_number?: string
+          status?: string | null
+          subtotal?: number
+          total?: number
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
