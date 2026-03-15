@@ -105,6 +105,51 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_portal_access: {
+        Row: {
+          access_code: string
+          created_at: string | null
+          customer_id: string
+          id: string
+          is_active: boolean | null
+          job_id: string
+          last_accessed: string | null
+        }
+        Insert: {
+          access_code: string
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          is_active?: boolean | null
+          job_id: string
+          last_accessed?: string | null
+        }
+        Update: {
+          access_code?: string
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          is_active?: boolean | null
+          job_id?: string
+          last_accessed?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_portal_access_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_portal_access_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       insurance_policies: {
         Row: {
           annual_premium: number
@@ -245,6 +290,182 @@ export type Database = {
           },
         ]
       }
+      jobs: {
+        Row: {
+          actual_hours: number | null
+          address: string
+          assigned_team: string[] | null
+          completed_at: string | null
+          created_at: string | null
+          customer_id: string
+          description: string | null
+          end_date: string | null
+          estimated_hours: number | null
+          final_price: number | null
+          id: string
+          job_number: string
+          materials_needed: string | null
+          notes: string | null
+          postcode: string | null
+          priority: string | null
+          quoted_price: number | null
+          start_date: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          actual_hours?: number | null
+          address: string
+          assigned_team?: string[] | null
+          completed_at?: string | null
+          created_at?: string | null
+          customer_id: string
+          description?: string | null
+          end_date?: string | null
+          estimated_hours?: number | null
+          final_price?: number | null
+          id?: string
+          job_number: string
+          materials_needed?: string | null
+          notes?: string | null
+          postcode?: string | null
+          priority?: string | null
+          quoted_price?: number | null
+          start_date?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          actual_hours?: number | null
+          address?: string
+          assigned_team?: string[] | null
+          completed_at?: string | null
+          created_at?: string | null
+          customer_id?: string
+          description?: string | null
+          end_date?: string | null
+          estimated_hours?: number | null
+          final_price?: number | null
+          id?: string
+          job_number?: string
+          materials_needed?: string | null
+          notes?: string | null
+          postcode?: string | null
+          priority?: string | null
+          quoted_price?: number | null
+          start_date?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          address: string | null
+          assigned_to: string | null
+          budget_range: string | null
+          converted_to_customer_id: string | null
+          created_at: string | null
+          customer_name: string
+          email: string | null
+          id: string
+          message: string | null
+          notes: string | null
+          phone: string
+          postcode: string | null
+          service_requested: string
+          source: string
+          status: string | null
+          updated_at: string | null
+          urgency: string | null
+        }
+        Insert: {
+          address?: string | null
+          assigned_to?: string | null
+          budget_range?: string | null
+          converted_to_customer_id?: string | null
+          created_at?: string | null
+          customer_name: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          notes?: string | null
+          phone: string
+          postcode?: string | null
+          service_requested: string
+          source?: string
+          status?: string | null
+          updated_at?: string | null
+          urgency?: string | null
+        }
+        Update: {
+          address?: string | null
+          assigned_to?: string | null
+          budget_range?: string | null
+          converted_to_customer_id?: string | null
+          created_at?: string | null
+          customer_name?: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          notes?: string | null
+          phone?: string
+          postcode?: string | null
+          service_requested?: string
+          source?: string
+          status?: string | null
+          updated_at?: string | null
+          urgency?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_converted_to_customer_id_fkey"
+            columns: ["converted_to_customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_converted_to_customer_id_fkey"
+            columns: ["converted_to_customer_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_guide: {
         Row: {
           category: string
@@ -319,6 +540,125 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      purchase_orders: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          delivery_date: string | null
+          id: string
+          items: Json | null
+          job_id: string | null
+          notes: string | null
+          order_date: string | null
+          po_number: string
+          status: string | null
+          supplier: string
+          total_amount: number
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          delivery_date?: string | null
+          id?: string
+          items?: Json | null
+          job_id?: string | null
+          notes?: string | null
+          order_date?: string | null
+          po_number: string
+          status?: string | null
+          supplier: string
+          total_amount: number
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          delivery_date?: string | null
+          id?: string
+          items?: Json | null
+          job_id?: string | null
+          notes?: string | null
+          order_date?: string | null
+          po_number?: string
+          status?: string | null
+          supplier?: string
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_logs: {
+        Row: {
+          created_at: string | null
+          hours_worked: number
+          id: string
+          job_id: string
+          log_date: string
+          user_id: string
+          work_description: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          hours_worked: number
+          id?: string
+          job_id: string
+          log_date?: string
+          user_id: string
+          work_description?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          hours_worked?: number
+          id?: string
+          job_id?: string
+          log_date?: string
+          user_id?: string
+          work_description?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

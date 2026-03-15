@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Clock, Package, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { MapLauncher } from "@/components/MapLauncher";
 
 export default function MyWeekPage() {
   // Mock data - will be replaced with real data filtered by assigned team member
@@ -148,10 +149,11 @@ export default function MyWeekPage() {
                           <h3 className="font-semibold text-gray-900">{job.type}</h3>
                           <p className="text-sm text-gray-600">{job.customer}</p>
                         </div>
-                        <div className="flex items-start gap-2 text-sm text-gray-700">
-                          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-900" />
+                        <div className="flex items-start gap-2 text-sm text-muted-foreground mb-2">
+                          <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
                           <span>{job.address}</span>
                         </div>
+                        <MapLauncher address={job.address} variant="outline" size="sm" />
                       </div>
                       <Link href={`/jobs/${job.id}`}>
                         <Button variant="outline" size="sm">

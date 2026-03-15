@@ -22,6 +22,7 @@ import {
   Upload
 } from "lucide-react";
 import Link from "next/link";
+import { MapLauncher } from "@/components/MapLauncher";
 
 export default function JobDetailPage() {
   const router = useRouter();
@@ -190,17 +191,16 @@ export default function JobDetailPage() {
               <CardTitle className="text-base">Location</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-start gap-2 mb-4">
-                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="font-medium">{job.address}</p>
-                  <p className="text-sm text-muted-foreground">{job.postcode}</p>
+              <div className="flex items-start gap-3">
+                <MapPin className="w-5 h-5 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Site Address</p>
+                  <p className="font-medium text-sm">{job.address}</p>
+                  <div className="mt-2">
+                    <MapLauncher address={job.address} />
+                  </div>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="w-full" onClick={handleOpenMaps}>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Open in Maps
-              </Button>
             </CardContent>
           </Card>
 
