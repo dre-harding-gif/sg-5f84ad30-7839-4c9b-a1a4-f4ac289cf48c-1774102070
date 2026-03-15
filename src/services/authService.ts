@@ -123,15 +123,47 @@ export const authService = {
 
       if (profileError) throw profileError;
 
-      // Send invitation email with credentials
-      // Note: In production, you'd use a proper email service
-      // For now, we'll return the credentials to display to the admin
-      return {
-        success: true,
-        email,
-        tempPassword,
-        userId: authData.user.id,
-      };
+      // Send invitation email via Edge Function
+      const appUrl = typeof window !== "undefined" ? window.location.origin : "";
+      const companyName = "Harding Homes"; // You can make this dynamic from settings
+      
+      try {
+        const { data: emailData, error: emailError } = await supabase.functions.invoke('send-invitation-email', {
+          body: {
+            to: email,
+            fullName,
+            tempPassword,
+            role,
+            appUrl,
+            companyName,
+          },
+        });
+
+        if (emailError) {
+          console.error("Email sending failed:", emailError);
+          // Don't throw - user was created successfully, just email failed
+        }
+
+        return {
+          success: true,
+          email,
+          tempPassword,
+          userId: authData.user.id,
+          emailSent: !emailError,
+          emailDetails: emailData,
+        };
+      } catch (emailErr) {
+        console.error("Error invoking email function:", emailErr);
+        // Return success anyway - user was created
+        return {
+          success: true,
+          email,
+          tempPassword,
+          userId: authData.user.id,
+          emailSent: false,
+          emailError: "Email service unavailable",
+        };
+      }
     } catch (error: any) {
       return {
         success: false,
