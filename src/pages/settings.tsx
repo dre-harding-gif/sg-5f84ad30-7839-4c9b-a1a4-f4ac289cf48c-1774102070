@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { User, Bell, Shield, Palette, Save } from "lucide-react";
+import { User, Bell, Shield, Palette, Save, Smartphone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { SetupInstructions } from "@/components/SetupInstructions";
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -94,7 +95,7 @@ export default function SettingsPage() {
     <DashboardLayout>
       <SEO title="Settings - Harding Homes" />
       
-      <div className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto space-y-6">
+      <div className="px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-heading font-bold text-foreground">Settings</h1>
           <p className="text-muted-foreground mt-1">Manage your account and application preferences</p>
@@ -117,6 +118,10 @@ export default function SettingsPage() {
             <TabsTrigger value="appearance" className="data-[state=active]:bg-primary data-[state=active]:text-white">
               <Palette className="w-4 h-4 mr-2" />
               Appearance
+            </TabsTrigger>
+            <TabsTrigger value="setup" className="data-[state=active]:bg-primary data-[state=active]:text-white">
+              <Smartphone className="w-4 h-4 mr-2" />
+              Setup & QR Code
             </TabsTrigger>
           </TabsList>
 
@@ -316,6 +321,10 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="setup">
+            <SetupInstructions />
           </TabsContent>
         </Tabs>
       </div>
