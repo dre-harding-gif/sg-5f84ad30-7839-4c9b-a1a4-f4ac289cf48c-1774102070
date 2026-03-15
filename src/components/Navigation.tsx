@@ -4,23 +4,24 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { 
   LayoutDashboard, Users, Briefcase, Calendar, 
   FileText, Settings, TrendingUp, Building, 
-  Package, Clock, DollarSign
+  Package, Clock, DollarSign, Home, UserPlus, Shield, CalendarDays, Building2, BarChart3, Calculator
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Leads", href: "/leads", icon: TrendingUp },
-  { name: "Jobs", href: "/jobs", icon: Briefcase },
-  { name: "Customers", href: "/customers", icon: Users },
-  { name: "Schedule", href: "/schedule", icon: Calendar },
-  { name: "Team", href: "/team", icon: Users },
-  { name: "My Week", href: "/my-week", icon: Clock },
-  { name: "Inventory", href: "/inventory", icon: Package },
-  { name: "Company", href: "/company", icon: Building },
-  { name: "Reports", href: "/reports", icon: FileText },
-  { name: "Pricing", href: "/pricing", icon: DollarSign },
-  { name: "Settings", href: "/settings", icon: Settings },
+const menuItems = [
+  { href: "/", label: "Dashboard", icon: Home },
+  { href: "/leads", label: "Leads", icon: UserPlus },
+  { href: "/jobs", label: "Jobs", icon: Briefcase },
+  { href: "/customers", label: "Customers", icon: Users },
+  { href: "/schedule", label: "Schedule", icon: Calendar },
+  { href: "/team", label: "Team", icon: Users },
+  { href: "/user-roles", label: "User Roles", icon: Shield },
+  { href: "/my-week", label: "My Week", icon: CalendarDays },
+  { href: "/inventory", label: "Inventory", icon: Package },
+  { href: "/company", label: "Company", icon: Building2 },
+  { href: "/reports", label: "Reports", icon: BarChart3 },
+  { href: "/pricing", label: "Pricing", icon: Calculator },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 interface NavigationProps {
@@ -44,7 +45,7 @@ function NavigationContent({ onItemClick }: { onItemClick?: () => void }) {
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-1">
-        {navigation.map((item) => {
+        {menuItems.map((item) => {
           const isActive = router.pathname === item.href;
           const Icon = item.icon;
           
