@@ -92,37 +92,34 @@ export default function CustomerPortal() {
 
   const loadCustomerJobs = async (customerId: string) => {
     try {
-      // Load jobs first
-      const jobsResponse = await supabase
+      // Load jobs first with explicit any cast
+      const { data, error } = await supabase
         .from("jobs")
         .select("*")
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
 
-      const jobsData = jobsResponse.data as any;
-      const jobsError = jobsResponse.error;
+      if (error) throw error;
 
-      if (jobsError) throw jobsError;
+      // Explicit cast to bypass type inference
+      const jobsData: any = data;
 
       if (jobsData && jobsData.length > 0) {
-        const jobsList: any[] = Array.isArray(jobsData) ? jobsData : [];
-        const jobIds = jobsList.map((j: any) => j.id);
+        const jobIds = jobsData.map((j: any) => j.id);
 
         // Load photos for these jobs
-        const photosResponse = await supabase
+        const { data: photosData } = await supabase
           .from("job_photos")
           .select("*")
           .in("job_id", jobIds);
-        const photosData = photosResponse.data as any;
 
         // Load quotes for these jobs
-        const quotesResponse = await supabase
+        const { data: quotesData } = await supabase
           .from("quotes")
           .select("*")
           .in("job_id", jobIds);
-        const quotesData = quotesResponse.data as any;
 
-        const formattedJobs = jobsList.map((job: any) => ({
+        const formattedJobs = jobsData.map((job: any) => ({
           id: job.id,
           job_number: job.job_number || `JOB-${job.id.slice(0, 8)}`,
           status: job.status,
@@ -132,10 +129,10 @@ export default function CustomerPortal() {
           address: job.address || "No address",
           team_members: job.assigned_team || [],
           materials: job.materials || [],
-          photos: photosData?.filter((p: any) => p.job_id === job.id) || [],
+          photos: (photosData as any)?.filter((p: any) => p.job_id === job.id) || [],
           documents: [],
           messages: [],
-          estimated_cost: quotesData?.find((q: any) => q.job_id === job.id)?.total || job.estimated_cost || 0
+          estimated_cost: (quotesData as any)?.find((q: any) => q.job_id === job.id)?.total || job.estimated_cost || 0
         }));
 
         setJobs(formattedJobs);
