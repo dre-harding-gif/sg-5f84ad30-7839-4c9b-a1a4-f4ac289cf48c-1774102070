@@ -8,11 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Plus, Mail, Phone, CheckCircle2, Clock } from "lucide-react";
+import { Users, Plus, Mail, Phone, CheckCircle2, Clock, Eye, EyeOff, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getUserPermissions, updateUserRole } from "@/services/roleService";
 import type { UserRole } from "@/services/roleService";
 import { PermissionGate } from "@/components/PermissionGate";
+import { inviteUser } from "@/services/authService";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 interface TeamMember {
   id: string;
@@ -27,6 +31,21 @@ export default function TeamPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole>("builder");
+  const { toast } = useToast();
+  
+  // Invitation dialog state
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [inviteForm, setInviteForm] = useState({
+    email: "",
+    fullName: "",
+    role: "builder" as UserRole
+  });
+  
+  // Success dialog state
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const [invitedCredentials, setInvitedCredentials] = useState({ email: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     fetchTeamMembers();
@@ -62,6 +81,69 @@ export default function TeamPage() {
     }
   }
 
+  async function handleInviteUser() {
+    if (!inviteForm.email || !inviteForm.fullName) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setInviting(true);
+    const result = await inviteUser(inviteForm.email, inviteForm.fullName, inviteForm.role);
+    setInviting(false);
+
+    if (result.success && result.password) {
+      // Show success dialog with credentials
+      setInvitedCredentials({
+        email: inviteForm.email,
+        password: result.password
+      });
+      setSuccessDialogOpen(true);
+      setInviteDialogOpen(false);
+      
+      // Reset form
+      setInviteForm({
+        email: "",
+        fullName: "",
+        role: "builder"
+      });
+      
+      // Refresh team list
+      fetchTeamMembers();
+      
+      toast({
+        title: "User Invited Successfully",
+        description: "Share the credentials with the new team member"
+      });
+    } else {
+      toast({
+        title: "Invitation Failed",
+        description: result.error || "Failed to create user account",
+        variant: "destructive"
+      });
+    }
+  }
+
+  function copyCredentialsToClipboard() {
+    const credentials = `Harding Homes Login Credentials
+
+Email: ${invitedCredentials.email}
+Temporary Password: ${invitedCredentials.password}
+
+Login at: ${window.location.origin}
+
+⚠️ IMPORTANT: Change your password after first login (Settings → Security)`;
+
+    navigator.clipboard.writeText(credentials);
+    toast({
+      title: "Copied to Clipboard",
+      description: "Credentials copied! Share via WhatsApp, Email, or SMS"
+    });
+  }
+
   const getRoleBadgeColor = (role: UserRole) => {
     switch (role) {
       case "owner": return "bg-purple-100 text-purple-800 border-purple-200";
@@ -89,7 +171,10 @@ export default function TeamPage() {
               <p className="text-muted-foreground mt-1">Manage staff, roles, and permissions</p>
             </div>
             <PermissionGate require="manage_team">
-              <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+              <Button 
+                className="bg-orange-500 hover:bg-orange-600 text-white"
+                onClick={() => setInviteDialogOpen(true)}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Team Member
               </Button>
@@ -319,6 +404,131 @@ export default function TeamPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Invite User Dialog */}
+        <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Invite Team Member</DialogTitle>
+              <DialogDescription>
+                Add a new team member and assign their role
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name *</Label>
+                <Input
+                  id="fullName"
+                  placeholder="John Smith"
+                  value={inviteForm.fullName}
+                  onChange={(e) => setInviteForm({ ...inviteForm, fullName: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="john@example.com"
+                  value={inviteForm.email}
+                  onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role">Role *</Label>
+                <Select 
+                  value={inviteForm.role} 
+                  onValueChange={(value) => setInviteForm({ ...inviteForm, role: value as UserRole })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="owner">Owner</SelectItem>
+                    <SelectItem value="office_manager">Office Manager</SelectItem>
+                    <SelectItem value="site_manager">Site Manager</SelectItem>
+                    <SelectItem value="builder">Builder</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setInviteDialogOpen(false)}
+                  disabled={inviting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleInviteUser}
+                  disabled={inviting}
+                  className="bg-orange-500 hover:bg-orange-600"
+                >
+                  {inviting ? "Inviting..." : "Send Invitation"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Success Dialog with Credentials */}
+        <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-green-600">
+                <CheckCircle2 className="h-5 w-5" />
+                User Invited Successfully!
+              </DialogTitle>
+              <DialogDescription>
+                Share these credentials with the new team member
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="bg-muted p-4 rounded-lg space-y-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Email</Label>
+                  <p className="font-medium">{invitedCredentials.email}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Temporary Password</Label>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono font-medium">
+                      {showPassword ? invitedCredentials.password : "••••••••••••••••"}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg">
+                <p className="text-sm text-orange-800">
+                  ⚠️ <strong>Important:</strong> Ask the user to change their password after first login
+                </p>
+              </div>
+
+              <Button
+                onClick={copyCredentialsToClipboard}
+                className="w-full bg-orange-500 hover:bg-orange-600"
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copy Credentials to Clipboard
+              </Button>
+
+              <p className="text-xs text-muted-foreground text-center">
+                Share via WhatsApp, Email, SMS, or in person
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DashboardLayout>
     </PermissionGate>
   );
