@@ -5,8 +5,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   TrendingUp, Download, Calendar, Clock, DollarSign, 
-  Users, BarChart3, PieChart, FileText 
+  Users, BarChart3, PieChart as PieChartIcon, FileText 
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+
+const COLORS = ['#1e3a8a', '#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe'];
+
+const monthlyJobData = [
+  { name: 'Oct', completed: 4, ongoing: 2 },
+  { name: 'Nov', completed: 5, ongoing: 3 },
+  { name: 'Dec', completed: 3, ongoing: 4 },
+  { name: 'Jan', completed: 6, ongoing: 2 },
+  { name: 'Feb', completed: 4, ongoing: 5 },
+  { name: 'Mar', completed: 7, ongoing: 3 },
+];
+
+const jobStatusData = [
+  { name: 'Completed', value: 45 },
+  { name: 'In Progress', value: 12 },
+  { name: 'Scheduled', value: 8 },
+  { name: 'On Hold', value: 3 },
+];
 
 export default function ReportsPage() {
   return (
@@ -75,11 +94,18 @@ export default function ReportsPage() {
                   <CardTitle>Monthly Job Completion</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-64 flex items-center justify-center border-2 border-dashed border-border rounded-lg">
-                    <div className="text-center text-muted-foreground">
-                      <BarChart3 className="h-12 w-12 mx-auto mb-2" />
-                      <p>Chart visualization</p>
-                    </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={monthlyJobData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="completed" name="Completed" fill="#1e3a8a" />
+                        <Bar dataKey="ongoing" name="Ongoing" fill="#60a5fa" />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
@@ -89,11 +115,26 @@ export default function ReportsPage() {
                   <CardTitle>Job Status Distribution</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-64 flex items-center justify-center border-2 border-dashed border-border rounded-lg">
-                    <div className="text-center text-muted-foreground">
-                      <PieChart className="h-12 w-12 mx-auto mb-2" />
-                      <p>Chart visualization</p>
-                    </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={jobStatusData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {jobStatusData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>

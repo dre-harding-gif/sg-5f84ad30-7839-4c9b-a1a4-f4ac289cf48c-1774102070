@@ -6,10 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Package, Wrench, AlertTriangle, Plus, Search, Hand } from "lucide-react";
+import { Package, Wrench, AlertTriangle, Plus, Search, Hand, TrendingDown, BarChart3 } from "lucide-react";
 import { PermissionGate } from "@/components/PermissionGate";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+
+const COLORS = ['#1e3a8a', '#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe'];
 
 interface InventoryItem {
   id: string;
@@ -73,6 +76,34 @@ export default function InventoryPage() {
     item.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Analytics data
+  const stockValueByCategory = materials.reduce((acc, item) => {
+    const existing = acc.find(x => x.name === item.category);
+    const value = item.current_quantity * item.unit_cost;
+    if (existing) {
+      existing.value += value;
+    } else {
+      acc.push({ name: item.category, value });
+    }
+    return acc;
+  }, [] as { name: string; value: number }[]);
+
+  const lowStockItems = materials.filter(item => 
+    item.current_quantity <= item.reorder_level && item.current_quantity > 0
+  ).length;
+
+  const outOfStockItems = materials.filter(item => item.current_quantity === 0).length;
+
+  const toolsInUse = tools.filter(item => item.assigned_to).length;
+
+  const topValueMaterials = materials
+    .map(item => ({
+      name: item.name,
+      value: item.current_quantity * item.unit_cost
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+
   if (loading) {
     return (
       <PermissionGate require="view_inventory">
@@ -112,6 +143,92 @@ export default function InventoryPage() {
                 Add Item
               </Button>
             </div>
+          </div>
+
+          {/* Analytics Dashboard */}
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total Stock Value</CardDescription>
+                <CardTitle className="text-3xl">
+                  £{stockValueByCategory.reduce((sum, cat) => sum + cat.value, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Across {materials.length} materials</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Low Stock Items</CardDescription>
+                <CardTitle className="text-3xl text-orange-600">{lowStockItems}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Need reordering soon</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Out of Stock</CardDescription>
+                <CardTitle className="text-3xl text-red-600">{outOfStockItems}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Critical restock needed</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Tools In Use</CardDescription>
+                <CardTitle className="text-3xl">{toolsInUse}/{tools.length}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Currently checked out</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Analytics Charts */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Stock Value by Category
+                </CardTitle>
+                <CardDescription>Total value of materials in each category</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={stockValueByCategory}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                    <YAxis />
+                    <Tooltip formatter={(value) => `£${Number(value).toFixed(0)}`} />
+                    <Bar dataKey="value" fill="#1e3a8a" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5" />
+                  Top 5 Materials by Value
+                </CardTitle>
+                <CardDescription>Highest value inventory items</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {topValueMaterials.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{item.name}</span>
+                      <span className="text-sm font-bold text-blue-900">£{item.value.toFixed(0)}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <Tabs defaultValue="materials" className="space-y-6">
