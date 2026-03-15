@@ -45,7 +45,7 @@ export default function Dashboard() {
       const [jobsResult, leadsResult, teamResult, inventoryResult] = await Promise.all([
         supabase.from("jobs").select("*").order("created_at", { ascending: false }),
         supabase.from("leads").select("*").order("created_at", { ascending: false }),
-        supabase.from("team_members").select("*"),
+        supabase.from("profiles").select("*"),
         supabase.from("inventory_items").select("*")
       ]);
 
