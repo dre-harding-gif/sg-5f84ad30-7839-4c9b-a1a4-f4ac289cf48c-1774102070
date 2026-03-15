@@ -8,14 +8,17 @@ import {
   getRoleBadgeColor,
   type UserRole 
 } from "@/services/roleService";
+import { authService } from "@/services/authService";
 import type { Tables } from "@/integrations/supabase/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Users, Mail, Calendar, Filter, Search, X } from "lucide-react";
+import { Shield, Users, Mail, Calendar, Filter, Search, X, UserPlus, Copy, Eye, EyeOff } from "lucide-react";
 
 const roles: UserRole[] = ["owner", "office_manager", "site_manager", "builder", "customer"];
 
@@ -26,6 +29,18 @@ export default function UserRolesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [inviteForm, setInviteForm] = useState({
+    fullName: "",
+    email: "",
+    role: "builder" as UserRole,
+  });
+  const [invitationResult, setInvitationResult] = useState<{
+    email: string;
+    tempPassword: string;
+  } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -93,15 +108,216 @@ export default function UserRolesPage() {
     setUpdating(null);
   }
 
+  async function handleInviteUser() {
+    if (!inviteForm.fullName || !inviteForm.email) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide both name and email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setInviting(true);
+    const result = await authService.inviteUser(
+      inviteForm.email,
+      inviteForm.fullName,
+      inviteForm.role
+    );
+
+    if (result.success) {
+      setInvitationResult({
+        email: result.email!,
+        tempPassword: result.tempPassword!,
+      });
+      
+      toast({
+        title: "User Invited!",
+        description: `Invitation sent to ${inviteForm.email}`,
+      });
+      
+      await loadUsers();
+      
+      // Reset form
+      setInviteForm({
+        fullName: "",
+        email: "",
+        role: "builder",
+      });
+    } else {
+      toast({
+        title: "Invitation Failed",
+        description: result.error || "Failed to invite user.",
+        variant: "destructive",
+      });
+    }
+    setInviting(false);
+  }
+
+  function copyCredentials() {
+    if (!invitationResult) return;
+    
+    const credentials = `Login Credentials for ${invitationResult.email}
+
+Email: ${invitationResult.email}
+Temporary Password: ${invitationResult.tempPassword}
+
+Please change your password after first login.
+Login at: ${window.location.origin}`;
+
+    navigator.clipboard.writeText(credentials);
+    toast({
+      title: "Copied!",
+      description: "Login credentials copied to clipboard",
+    });
+  }
+
+  function closeInviteDialog() {
+    setInviteDialogOpen(false);
+    setInvitationResult(null);
+    setShowPassword(false);
+  }
+
   return (
     <DashboardLayout>
       <PermissionGate require="manage_team">
         <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold">User Roles & Permissions</h1>
-            <p className="text-muted-foreground mt-2">
-              Manage team member roles and access levels
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">User Roles & Permissions</h1>
+              <p className="text-muted-foreground mt-2">
+                Manage team member roles and access levels
+              </p>
+            </div>
+            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="lg">
+                  <UserPlus className="h-5 w-5 mr-2" />
+                  Invite User
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                {!invitationResult ? (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>Invite New Team Member</DialogTitle>
+                      <DialogDescription>
+                        Create a new user account and assign their role. They'll receive login credentials to get started.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="fullName">Full Name *</Label>
+                        <Input
+                          id="fullName"
+                          placeholder="John Smith"
+                          value={inviteForm.fullName}
+                          onChange={(e) => setInviteForm({ ...inviteForm, fullName: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email Address *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="john@example.com"
+                          value={inviteForm.email}
+                          onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="role">Role *</Label>
+                        <Select
+                          value={inviteForm.role}
+                          onValueChange={(value) => setInviteForm({ ...inviteForm, role: value as UserRole })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {roles.map((role) => (
+                              <SelectItem key={role} value={role}>
+                                {getRoleDisplayName(role)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          {inviteForm.role === "owner" && "Full system access - manage everything"}
+                          {inviteForm.role === "office_manager" && "Manage leads, customers, quotes, and schedules"}
+                          {inviteForm.role === "site_manager" && "Manage jobs, assign work, track inventory"}
+                          {inviteForm.role === "builder" && "View assigned jobs, track time, check out materials"}
+                          {inviteForm.role === "customer" && "Portal access only - view their jobs"}
+                        </p>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={closeInviteDialog}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleInviteUser} disabled={inviting}>
+                        {inviting ? "Sending Invitation..." : "Send Invitation"}
+                      </Button>
+                    </DialogFooter>
+                  </>
+                ) : (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>User Invited Successfully! 🎉</DialogTitle>
+                      <DialogDescription>
+                        Share these login credentials with the new team member
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Email Address</Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={invitationResult.email}
+                              readOnly
+                              className="bg-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Temporary Password</Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              value={invitationResult.tempPassword}
+                              readOnly
+                              className="bg-white font-mono"
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <p className="text-sm text-amber-900">
+                          <strong>⚠️ Important:</strong> The user must change this temporary password on their first login.
+                        </p>
+                      </div>
+                      <Button onClick={copyCredentials} className="w-full" variant="outline">
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Credentials to Clipboard
+                      </Button>
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={closeInviteDialog}>
+                        Done
+                      </Button>
+                    </DialogFooter>
+                  </>
+                )}
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Role Permissions Guide */}

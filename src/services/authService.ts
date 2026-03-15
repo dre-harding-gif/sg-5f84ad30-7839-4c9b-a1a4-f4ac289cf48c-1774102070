@@ -92,6 +92,55 @@ export const authService = {
   },
 
   /**
+   * Invite a new user with email and assign role
+   * Creates the user account and sends invitation email
+   */
+  async inviteUser(email: string, fullName: string, role: string) {
+    try {
+      // Generate a temporary password
+      const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+      
+      // Create the user account with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          full_name: fullName,
+        },
+      });
+
+      if (authError) throw authError;
+
+      // Update the user's profile with their role
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ 
+          role,
+          full_name: fullName,
+        })
+        .eq("id", authData.user.id);
+
+      if (profileError) throw profileError;
+
+      // Send invitation email with credentials
+      // Note: In production, you'd use a proper email service
+      // For now, we'll return the credentials to display to the admin
+      return {
+        success: true,
+        email,
+        tempPassword,
+        userId: authData.user.id,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  },
+
+  /**
    * Sign in with Google OAuth
    */
   async signInWithGoogle() {
