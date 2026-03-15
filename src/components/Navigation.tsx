@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { 
   LayoutDashboard, Users, Briefcase, Calendar, 
   FileText, Settings, TrendingUp, Building, 
@@ -22,11 +23,16 @@ const navigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
-export function Navigation() {
+interface NavigationProps {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
+
+function NavigationContent() {
   const router = useRouter();
 
   return (
-    <nav className="w-64 bg-secondary flex-shrink-0 border-r border-border flex flex-col">
+    <>
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <Building className="h-8 w-8 text-primary" />
@@ -62,6 +68,27 @@ export function Navigation() {
           <p>Building Excellence Since 2010</p>
         </div>
       </div>
-    </nav>
+    </>
+  );
+}
+
+export function Navigation({ mobileOpen, onMobileClose }: NavigationProps) {
+  return (
+    <>
+      {/* Desktop Navigation - Hidden on mobile */}
+      <nav className="hidden lg:flex w-64 bg-secondary flex-shrink-0 border-r border-border flex-col">
+        <NavigationContent />
+      </nav>
+
+      {/* Mobile Navigation - Drawer */}
+      <Sheet open={mobileOpen} onOpenChange={onMobileClose}>
+        <SheetContent side="left" className="w-64 p-0 flex flex-col">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Navigation Menu</SheetTitle>
+          </SheetHeader>
+          <NavigationContent />
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
