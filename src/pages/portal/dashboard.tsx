@@ -93,7 +93,7 @@ export default function CustomerPortal() {
   const loadCustomerJobs = async (customerId: string) => {
     try {
       // Load jobs first - bypass type checking completely
-      const jobsResponse = await supabase
+      const jobsResponse: any = await supabase
         .from("jobs")
         .select("*")
         .eq("customer_id", customerId)
@@ -101,25 +101,24 @@ export default function CustomerPortal() {
 
       if (jobsResponse.error) throw jobsResponse.error;
 
-      // Force cast the entire response to bypass type inference
-      const jobsData = (jobsResponse as any).data;
+      const jobsData = jobsResponse.data;
 
       if (jobsData && jobsData.length > 0) {
         const jobIds = jobsData.map((j: any) => j.id);
 
         // Load photos for these jobs
-        const photosResponse = await supabase
+        const photosResponse: any = await supabase
           .from("job_photos")
           .select("*")
           .in("job_id", jobIds);
-        const photosData = (photosResponse as any).data;
+        const photosData = photosResponse.data;
 
         // Load quotes for these jobs
-        const quotesResponse = await supabase
+        const quotesResponse: any = await supabase
           .from("quotes")
           .select("*")
           .in("job_id", jobIds);
-        const quotesData = (quotesResponse as any).data;
+        const quotesData = quotesResponse.data;
 
         const formattedJobs = jobsData.map((job: any) => ({
           id: job.id,
