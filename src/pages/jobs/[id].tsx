@@ -25,6 +25,7 @@ import { PhotoLightbox } from "@/components/PhotoLightbox";
 import { QuoteGenerator } from "@/components/QuoteGenerator";
 import { InvoiceGenerator } from "@/components/InvoiceGenerator";
 import { useToast } from "@/hooks/use-toast";
+import { sendNotification, sendCustomNotification } from "@/services/notificationService";
 
 export default function JobDetailPage() {
   const router = useRouter();
@@ -94,7 +95,7 @@ export default function JobDetailPage() {
     setLightboxOpen(true);
   };
 
-  const handleStatusChange = (newStatus: string) => {
+  const handleStatusChange = async (newStatus: string) => {
     setJob({ ...job, status: newStatus });
     
     // Auto-prompt for photos based on status
@@ -103,24 +104,74 @@ export default function JobDetailPage() {
         title: "Job Started!",
         description: "Don't forget to take your 'Before' photos. Switching to Photos tab...",
       });
-      // Switch to photos tab logic could go here
+      
+      // Send automated notification
+      try {
+        await sendNotification(job.customer.id, "jobStarting", {
+          jobNumber: job.jobNumber,
+          jobTitle: job.title,
+          startDate: new Date().toLocaleDateString(),
+          teamMembers: job.team.map(m => `- ${m.name} (${m.role})`).join("\n"),
+          portalLink: `${window.location.origin}/portal/dashboard`
+        });
+        
+        toast({
+          title: "Customer Notified",
+          description: "Automated email sent to customer about job start",
+        });
+      } catch (error) {
+        console.error("Notification error:", error);
+      }
     } else if (newStatus === "completed") {
       setJob({ ...job, status: "completed", progress: 100 });
       toast({
         title: "Job Completed!",
         description: "Great work! Please upload the final 'After' photos for the portfolio.",
       });
+      
+      // Send completion notification
+      try {
+        await sendNotification(job.customer.id, "jobCompleted", {
+          jobNumber: job.jobNumber,
+          jobTitle: job.title,
+          completionDate: new Date().toLocaleDateString(),
+          invoiceNumber: "INV-" + Date.now(),
+          portalLink: `${window.location.origin}/portal/dashboard`
+        });
+        
+        toast({
+          title: "Customer Notified",
+          description: "Job completion email sent with portal access for final review",
+        });
+      } catch (error) {
+        console.error("Notification error:", error);
+      }
     }
   };
 
   const sendNotification = async () => {
     if (!notificationMessage) return;
     
-    toast({
-      title: `${notificationType.toUpperCase()} Sent`,
-      description: `Message successfully sent to ${job.customer.name}`,
-    });
-    setNotificationMessage("");
+    try {
+      await sendCustomNotification(
+        job.customer.id,
+        notificationType as "email" | "sms",
+        notificationMessage,
+        notificationType === "email" ? `Update on ${job.title}` : undefined
+      );
+      
+      toast({
+        title: `${notificationType.toUpperCase()} Sent`,
+        description: `Message successfully sent to ${job.customer.name}`,
+      });
+      setNotificationMessage("");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   return (
