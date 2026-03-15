@@ -178,7 +178,7 @@ export async function sendNotification(
   try {
     // Get customer details
     const { data: customer } = await supabase
-      .from("customers")
+      .from("customers" as any)
       .select("name, email, phone")
       .eq("id", customerId)
       .single();
@@ -212,7 +212,7 @@ export async function sendNotification(
       console.log("Email to send:", emailContent);
 
       // Save notification record
-      await supabase.from("notifications").insert({
+      await supabase.from("notifications" as any).insert({
         customer_id: customerId,
         type: "email",
         template: templateKey,
@@ -236,7 +236,7 @@ export async function sendNotification(
       console.log("SMS to send:", smsContent);
 
       // Save notification record
-      await supabase.from("notifications").insert({
+      await supabase.from("notifications" as any).insert({
         customer_id: customerId,
         type: "sms",
         template: templateKey,
@@ -264,7 +264,7 @@ export async function sendCustomNotification(
 ) {
   try {
     const { data: customer } = await supabase
-      .from("customers")
+      .from("customers" as any)
       .select("name, email, phone")
       .eq("id", customerId)
       .single();
@@ -277,7 +277,7 @@ export async function sendCustomNotification(
       console.log("Custom SMS:", { to: customer.phone, message });
     }
 
-    await supabase.from("notifications").insert({
+    await supabase.from("notifications" as any).insert({
       customer_id: customerId,
       type,
       subject: subject || null,

@@ -149,7 +149,7 @@ export default function JobDetailPage() {
     }
   };
 
-  const sendNotification = async () => {
+  const handleSendNotification = async () => {
     if (!notificationMessage) return;
     
     try {
@@ -466,7 +466,7 @@ export default function JobDetailPage() {
                     />
                   </div>
 
-                  <Button onClick={sendNotification} className="w-full sm:w-auto" disabled={!notificationMessage}>
+                  <Button onClick={handleSendNotification} className="w-full sm:w-auto" disabled={!notificationMessage}>
                     <Send className="w-4 h-4 mr-2" />
                     Send Notification
                   </Button>
