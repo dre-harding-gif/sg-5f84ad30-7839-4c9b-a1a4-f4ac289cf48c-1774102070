@@ -1,21 +1,22 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
-import { getCurrentUserPermissions, getCurrentUserRole, UserPermissions, UserRole } from "@/services/roleService";
-import {
-  LayoutDashboard,
-  Briefcase,
-  Calendar,
-  Users,
-  UserCircle,
-  Package,
-  PoundSterling,
-  Building,
-  ClipboardList,
+import { getUserPermissions, type UserRole, type UserPermissions } from "@/services/roleService";
+import { 
+  LayoutDashboard, 
+  Briefcase, 
+  Users, 
+  Calendar, 
   Settings,
-  CalendarDays
+  Package,
+  Building,
+  CalendarDays,
+  ClipboardList,
+  UserCircle,
+  PoundSterling,
+  FileText
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const allNavItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard, permission: "view_dashboard" as keyof UserPermissions },
@@ -28,8 +29,8 @@ const allNavItems = [
   { name: "Inventory", href: "/inventory", icon: Package, permission: "view_inventory" as keyof UserPermissions },
   { name: "Pricing", href: "/pricing", icon: PoundSterling, permission: "view_pricing" as keyof UserPermissions },
   { name: "Company", href: "/company", icon: Building, permission: "view_company" as keyof UserPermissions },
-  { name: "Reports", href: "/reports", icon: ClipboardList, permission: "view_reports" as keyof UserPermissions },
-  { name: "Settings", href: "/settings", icon: Settings, permission: "view_settings" as keyof UserPermissions },
+  { name: "Reports", href: "/reports", icon: FileText, permission: "view_reports" as keyof UserPermissions },
+  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function Navigation() {
@@ -39,23 +40,15 @@ export function Navigation() {
 
   useEffect(() => {
     async function filterNavigation() {
-      const permissions = await getCurrentUserPermissions();
-      const role = await getCurrentUserRole();
-      setUserRole(role);
-
-      if (!permissions) {
-        setNavItems([]);
-        return;
-      }
+      const permissions = await getUserPermissions();
+      setUserRole(permissions.role);
 
       const filtered = allNavItems.filter(item => {
-        // Check role-specific items (like My Week for builders)
         if (item.roles) {
-          return role && item.roles.includes(role);
+          return permissions.role && item.roles.includes(permissions.role);
         }
-        // Check permission-based items
         if (item.permission) {
-          return permissions[item.permission];
+          return permissions[item.permission as keyof UserPermissions] === true;
         }
         return true;
       });

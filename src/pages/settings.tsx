@@ -44,10 +44,11 @@ export default function SettingsPage() {
         .single();
 
       if (data) {
+        const profileData = data as any;
         setProfile({
           full_name: data.full_name || "",
           email: user.email || "",
-          phone: data.phone || "",
+          phone: profileData.phone || "",
         });
       }
     } catch (error) {
@@ -61,12 +62,14 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const updateData: any = {
+        full_name: profile.full_name,
+        phone: profile.phone,
+      };
+
       const { error } = await supabase
         .from("profiles")
-        .update({
-          full_name: profile.full_name,
-          phone: profile.phone,
-        })
+        .update(updateData)
         .eq("id", user.id);
 
       if (error) throw error;

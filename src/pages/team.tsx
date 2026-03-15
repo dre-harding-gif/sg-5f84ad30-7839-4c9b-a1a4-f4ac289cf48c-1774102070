@@ -1,204 +1,325 @@
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { SEO } from "@/components/SEO";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Phone, Mail, MapPin, Calendar, Wrench, Crown, Briefcase, HardHat, User } from "lucide-react";
-import { useState, useEffect } from "react";
-import { getCurrentUserRole, updateUserRole, UserRole } from "@/services/roleService";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Users, Plus, Mail, Phone, CheckCircle2, Clock } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { getUserPermissions, updateUserRole } from "@/services/roleService";
+import type { UserRole } from "@/services/roleService";
+import { PermissionGate } from "@/components/PermissionGate";
+
+interface TeamMember {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  role: UserRole;
+  status: string;
+}
 
 export default function TeamPage() {
-  const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
-  const [teamMembers, setTeamMembers] = useState([
-    {
-      id: "1",
-      name: "John Smith",
-      role: "site_manager" as UserRole,
-      email: "john.smith@hardinghomes.com",
-      phone: "07700 900123",
-      specialization: "Extensions & Conversions",
-      status: "active",
-      currentJobs: 3,
-      joinDate: "2019-03-15",
-      address: "Reading, Berkshire"
-    },
-    {
-      id: "2",
-      name: "Mike Johnson",
-      role: "builder" as UserRole,
-      email: "mike.j@hardinghomes.com",
-      phone: "07700 900456",
-      specialization: "Bricklaying",
-      status: "active",
-      currentJobs: 2,
-      joinDate: "2020-06-01",
-      address: "Henley-on-Thames"
-    },
-    {
-      id: "3",
-      name: "Sarah Williams",
-      role: "office_manager" as UserRole,
-      email: "sarah.w@hardinghomes.com",
-      phone: "07700 900789",
-      specialization: "Project Coordination",
-      status: "active",
-      currentJobs: 12,
-      joinDate: "2018-09-10",
-      address: "Reading, Berkshire"
-    },
-    {
-      id: "4",
-      name: "Tom Davies",
-      role: "builder" as UserRole,
-      email: "tom.d@hardinghomes.com",
-      phone: "07700 900321",
-      specialization: "Carpentry & Joinery",
-      status: "active",
-      currentJobs: 1,
-      joinDate: "2021-01-20",
-      address: "Caversham"
-    }
-  ]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<UserRole>("builder");
 
   useEffect(() => {
-    async function fetchUserRole() {
-      const role = await getCurrentUserRole();
-      setCurrentUserRole(role);
-    }
+    fetchTeamMembers();
     fetchUserRole();
   }, []);
 
-  const getRoleIcon = (role: UserRole) => {
-    switch (role) {
-      case "owner": return <Crown className="h-4 w-4" />;
-      case "office_manager": return <Briefcase className="h-4 w-4" />;
-      case "site_manager": return <HardHat className="h-4 w-4" />;
-      case "builder": return <Wrench className="h-4 w-4" />;
-      default: return <User className="h-4 w-4" />;
+  async function fetchUserRole() {
+    const permissions = await getUserPermissions();
+    setUserRole(permissions.role);
+  }
+
+  async function fetchTeamMembers() {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (data) {
+      setTeamMembers(data.map(member => ({
+        ...member,
+        status: "active" // Default mock status for all members since we don't have it in profiles yet
+      })) as TeamMember[]);
     }
-  };
+    setLoading(false);
+  }
+
+  async function handleRoleChange(userId: string, newRole: UserRole) {
+    const success = await updateUserRole(userId, newRole);
+    if (success) {
+      setTeamMembers(teamMembers.map(member => 
+        member.id === userId ? { ...member, role: newRole } : member
+      ));
+    }
+  }
 
   const getRoleBadgeColor = (role: UserRole) => {
     switch (role) {
-      case "owner": return "bg-purple-100 text-purple-800";
-      case "office_manager": return "bg-blue-100 text-blue-800";
-      case "site_manager": return "bg-green-100 text-green-800";
-      case "builder": return "bg-orange-100 text-orange-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "owner": return "bg-purple-100 text-purple-800 border-purple-200";
+      case "office_manager": return "bg-blue-100 text-blue-800 border-blue-200";
+      case "site_manager": return "bg-green-100 text-green-800 border-green-200";
+      case "builder": return "bg-orange-100 text-orange-800 border-orange-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
 
-  const handleRoleChange = async (memberId: string, newRole: UserRole) => {
-    const success = await updateUserRole(memberId, newRole);
-    if (success) {
-      setTeamMembers(prev =>
-        prev.map(member =>
-          member.id === memberId ? { ...member, role: newRole } : member
-        )
-      );
-    }
+  const getRoleDisplayName = (role: UserRole) => {
+    return role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
-
-  const canEditRoles = currentUserRole === "owner";
 
   return (
-    <DashboardLayout>
-      <SEO title="Team Management" description="Manage your team members and their roles" />
-      
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Team</h1>
-            <p className="text-gray-600 mt-2">Manage team members and their access levels</p>
+    <PermissionGate require="view_team">
+      <DashboardLayout>
+        <SEO title="Team Management - Harding Homes" />
+        
+        <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-heading font-bold text-foreground">Team Management</h1>
+              <p className="text-muted-foreground mt-1">Manage staff, roles, and permissions</p>
+            </div>
+            <PermissionGate require="manage_team">
+              <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Team Member
+              </Button>
+            </PermissionGate>
           </div>
-          <Button>Add Team Member</Button>
-        </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          {teamMembers.map((member) => (
-            <Card key={member.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>{member.name}</CardTitle>
-                    <CardDescription className="mt-1 flex items-center gap-2">
-                      {getRoleIcon(member.role)}
-                      <span className="capitalize">{member.role.replace("_", " ")}</span>
-                    </CardDescription>
+                    <p className="text-sm text-muted-foreground">Total Team</p>
+                    <h3 className="text-2xl font-bold">{teamMembers.length}</h3>
                   </div>
-                  <Badge className={getRoleBadgeColor(member.role)}>
-                    {member.status}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Mail className="h-4 w-4" />
-                    {member.email}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Phone className="h-4 w-4" />
-                    {member.phone}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <MapPin className="h-4 w-4" />
-                    {member.address}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Wrench className="h-4 w-4" />
-                    {member.specialization}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Calendar className="h-4 w-4" />
-                    Joined {new Date(member.joinDate).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Current Jobs:</span>
-                    <Badge variant="outline">{member.currentJobs}</Badge>
-                  </div>
-
-                  {canEditRoles && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Access Level:</label>
-                      <Select
-                        value={member.role}
-                        onValueChange={(value) => handleRoleChange(member.id, value as UserRole)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="owner">Owner (Full Access)</SelectItem>
-                          <SelectItem value="office_manager">Office Manager</SelectItem>
-                          <SelectItem value="site_manager">Site Manager</SelectItem>
-                          <SelectItem value="builder">Builder/Tradesperson</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-gray-500">
-                        {member.role === "owner" && "Full system access including settings and billing"}
-                        {member.role === "office_manager" && "Can manage jobs, schedule, customers, and view reports"}
-                        {member.role === "site_manager" && "Can manage jobs, schedule, team, and inventory"}
-                        {member.role === "builder" && "Can view assigned jobs and check inventory"}
-                      </p>
-                    </div>
-                  )}
-
-                  {!canEditRoles && (
-                    <p className="text-xs text-gray-500 italic">
-                      Only owners can modify team member roles
-                    </p>
-                  )}
+                  <Users className="w-8 h-8 text-blue-500" />
                 </div>
               </CardContent>
             </Card>
-          ))}
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Active</p>
+                    <h3 className="text-2xl font-bold">{teamMembers.filter(m => m.status === 'active').length}</h3>
+                  </div>
+                  <CheckCircle2 className="w-8 h-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">On Jobs</p>
+                    <h3 className="text-2xl font-bold">4</h3>
+                  </div>
+                  <Clock className="w-8 h-8 text-orange-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Builders</p>
+                    <h3 className="text-2xl font-bold">{teamMembers.filter(m => m.role === 'builder').length}</h3>
+                  </div>
+                  <Users className="w-8 h-8 text-purple-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Team Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Team Members</CardTitle>
+              <CardDescription>Manage roles and access permissions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {teamMembers.map((member) => (
+                    <TableRow key={member.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarFallback>
+                              {member.full_name?.split(' ').map(n => n[0]).join('') || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{member.full_name || 'User'}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Mail className="w-4 h-4 text-muted-foreground" />
+                            <span>{member.email}</span>
+                          </div>
+                          {member.phone && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="w-4 h-4 text-muted-foreground" />
+                              <span>{member.phone}</span>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <PermissionGate require="manage_team" fallback={
+                          <Badge variant="outline" className={getRoleBadgeColor(member.role)}>
+                            {getRoleDisplayName(member.role)}
+                          </Badge>
+                        }>
+                          <Select 
+                            value={member.role} 
+                            onValueChange={(value) => handleRoleChange(member.id, value as UserRole)}
+                          >
+                            <SelectTrigger className="w-[180px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="owner">Owner</SelectItem>
+                              <SelectItem value="office_manager">Office Manager</SelectItem>
+                              <SelectItem value="site_manager">Site Manager</SelectItem>
+                              <SelectItem value="builder">Builder</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </PermissionGate>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className="bg-green-100 text-green-800">Active</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm">View Details</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Role Permissions Reference */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Role Permissions</CardTitle>
+              <CardDescription>What each role can access and manage</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="border rounded-lg p-4">
+                  <Badge className="bg-purple-100 text-purple-800 mb-3">Owner</Badge>
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Full system access
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Manage team roles
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Company finances
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      All reports
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="border rounded-lg p-4">
+                  <Badge className="bg-blue-100 text-blue-800 mb-3">Office Manager</Badge>
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Jobs & customers
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Pricing guide
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Inventory
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Reports
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="border rounded-lg p-4">
+                  <Badge className="bg-green-100 text-green-800 mb-3">Site Manager</Badge>
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Jobs & schedule
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Team management
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Inventory
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="border rounded-lg p-4">
+                  <Badge className="bg-orange-100 text-orange-800 mb-3">Builder</Badge>
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      My Week view
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Inventory lookup
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Job sheets
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </div>
-    </DashboardLayout>
+      </DashboardLayout>
+    </PermissionGate>
   );
 }

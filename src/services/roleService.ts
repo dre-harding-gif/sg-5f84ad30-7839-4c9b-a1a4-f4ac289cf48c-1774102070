@@ -1,65 +1,58 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type UserRole = "owner" | "office_manager" | "site_manager" | "builder" | "customer";
+export type UserRole = "owner" | "office_manager" | "site_manager" | "builder";
 
 export interface UserPermissions {
+  role: UserRole;
   view_dashboard: boolean;
   view_jobs: boolean;
-  edit_jobs: boolean;
   view_schedule: boolean;
-  edit_schedule: boolean;
   view_team: boolean;
-  edit_team: boolean;
-  view_customers: boolean;
-  edit_customers: boolean;
-  view_leads: boolean;
-  edit_leads: boolean;
-  view_inventory: boolean;
-  edit_inventory: boolean;
-  view_pricing: boolean;
-  edit_pricing: boolean;
   view_company: boolean;
-  edit_company: boolean;
+  view_inventory: boolean;
   view_reports: boolean;
-  view_settings: boolean;
-  edit_settings: boolean;
+  manage_team: boolean;
+  view_customers: boolean;
+  view_leads: boolean;
+  view_pricing: boolean;
 }
 
-export async function getCurrentUserPermissions(): Promise<UserPermissions | null> {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+const defaultPermissions: UserPermissions = {
+  role: "builder",
+  view_dashboard: true,
+  view_jobs: false,
+  view_schedule: false,
+  view_team: false,
+  view_company: false,
+  view_inventory: true,
+  view_reports: false,
+  manage_team: false,
+  view_customers: false,
+  view_leads: false,
+  view_pricing: false,
+};
 
-    const { data, error } = await supabase
+export async function getUserPermissions(): Promise<UserPermissions> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return defaultPermissions;
+
+    const { data } = await supabase
       .from("user_permissions")
-      .select("permissions")
-      .eq("id", user.id)
+      .select("*")
+      .eq("user_id", session.user.id)
       .single();
 
-    if (error) throw error;
-    return data.permissions as unknown as UserPermissions;
+    if (data && data.permissions) {
+       const perms = typeof data.permissions === 'object' ? data.permissions : {};
+       return {
+         role: data.role as UserRole,
+         ...perms
+       } as unknown as UserPermissions;
+    }
+    return defaultPermissions;
   } catch (error) {
-    console.error("Error fetching user permissions:", error);
-    return null;
-  }
-}
-
-export async function getCurrentUserRole(): Promise<UserRole | null> {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (error) throw error;
-    return data.role as UserRole;
-  } catch (error) {
-    console.error("Error fetching user role:", error);
-    return null;
+    return defaultPermissions;
   }
 }
 
@@ -69,33 +62,8 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<bo
       .from("profiles")
       .update({ role })
       .eq("id", userId);
-
-    if (error) throw error;
-    return true;
+    return !error;
   } catch (error) {
-    console.error("Error updating user role:", error);
     return false;
   }
-}
-
-export async function canAccessPage(pageName: string): Promise<boolean> {
-  const permissions = await getCurrentUserPermissions();
-  if (!permissions) return false;
-
-  const pagePermissionMap: Record<string, keyof UserPermissions> = {
-    "/": "view_dashboard",
-    "/jobs": "view_jobs",
-    "/schedule": "view_schedule",
-    "/team": "view_team",
-    "/customers": "view_customers",
-    "/leads": "view_leads",
-    "/inventory": "view_inventory",
-    "/pricing": "view_pricing",
-    "/company": "view_company",
-    "/reports": "view_reports",
-    "/settings": "view_settings",
-  };
-
-  const requiredPermission = pagePermissionMap[pageName];
-  return requiredPermission ? permissions[requiredPermission] : false;
 }

@@ -1,466 +1,590 @@
 import { useRouter } from "next/router";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
 import { 
+  ArrowLeft, 
   MapPin, 
   Phone, 
-  Mail, 
-  Calendar, 
-  Clock, 
-  Users, 
-  FileText, 
-  Download,
-  ExternalLink,
+  Mail,
+  FileText,
+  Package,
+  Receipt,
   Edit,
-  Trash2,
-  Plus,
-  ShoppingCart,
-  Upload
+  Clock,
+  User,
+  CheckCircle2,
+  Plus
 } from "lucide-react";
 import Link from "next/link";
+import { PhotoUpload } from "@/components/PhotoUpload";
 import { MapLauncher } from "@/components/MapLauncher";
+import { supabase } from "@/integrations/supabase/client";
+
+interface PurchaseOrder {
+  id: string;
+  order_number: string;
+  supplier: string;
+  items_description: string;
+  total_amount: number;
+  order_date: string;
+  status: string;
+}
+
+interface TimeLog {
+  id: string;
+  date: string;
+  staff_name: string;
+  hours_worked: number;
+  task_description: string;
+}
 
 export default function JobDetailPage() {
   const router = useRouter();
   const { id } = router.query;
+  const [loading, setLoading] = useState(true);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
+  const [newPO, setNewPO] = useState({ supplier: "", items: "", amount: "" });
+  const [newTimeLog, setNewTimeLog] = useState({ staff: "", hours: "", task: "" });
 
-  // Mock job data - replace with API call
   const job = {
-    id: "1",
+    id: id as string,
     jobNumber: "JOB-2024-001",
-    customerId: "1",
+    title: "Kitchen Extension",
+    status: "in_progress",
+    priority: "high",
     customer: {
       name: "Sarah Mitchell",
       email: "sarah.mitchell@email.com",
-      phone: "07123 456789",
+      phone: "07700 900123",
+      address: "45 Oak Avenue, Manchester, M20 4RJ"
     },
-    title: "Kitchen Extension - Mitchell Residence",
-    description: "Complete kitchen extension with bi-fold doors, new flooring, and modern fixtures",
-    address: "45 Oak Avenue, Manchester",
-    postcode: "M20 2RQ",
-    status: "in-progress",
-    priority: "high",
-    startDate: new Date("2026-03-01"),
-    endDate: new Date("2026-04-15"),
-    estimatedHours: 120,
-    actualHours: 65,
-    assignedTeam: [
-      { id: "1", name: "John Smith", role: "Lead Builder" },
-      { id: "2", name: "Mike Johnson", role: "Electrician" },
+    dates: {
+      start: "2026-03-01",
+      end: "2026-04-15",
+      estimated: "6 weeks"
+    },
+    team: [
+      { id: "1", name: "Mike Johnson", role: "Lead Builder", avatar: "" },
+      { id: "2", name: "Tom Davies", role: "Electrician", avatar: "" }
     ],
+    progress: 65,
+    estimatedValue: 45000,
     materials: [
-      { id: "1", name: "Bi-fold doors (3m)", quantity: 1, unit: "set", supplier: "Window World", inStock: false },
-      { id: "2", name: "Floor tiles", quantity: 25, unit: "sqm", supplier: "Tile Direct", inStock: false },
-      { id: "3", name: "Plasterboard (12.5mm)", quantity: 12, unit: "boards", supplier: "In Stock (Unit 1)", inStock: true, stockLocation: "Unit 1 - B1" },
-      { id: "4", name: "Copper Pipe (15mm)", quantity: 5, unit: "lengths", supplier: "In Stock (Unit 2)", inStock: true, stockLocation: "Unit 2 - Rack 3" },
-    ],
-    purchaseOrders: [
-      {
-        id: "1",
-        poNumber: "PO-2024-045",
-        supplier: "Window World",
-        totalAmount: 2500,
-        dateOrdered: new Date("2026-02-20"),
-        status: "received",
-      },
-      {
-        id: "2",
-        poNumber: "PO-2024-046",
-        supplier: "Tile Direct",
-        totalAmount: 850,
-        dateOrdered: new Date("2026-02-25"),
-        status: "received",
-      },
-    ],
-    documents: [
-      { id: "1", name: "Building Plans.pdf", type: "plan", uploadedAt: new Date("2026-02-15") },
-      { id: "2", name: "Electrical Spec.pdf", type: "specification", uploadedAt: new Date("2026-02-18") },
-    ],
-    photos: [
-      { id: "1", url: "/placeholder.jpg", caption: "Before work started", stage: "before" },
-      { id: "2", url: "/placeholder.jpg", caption: "Foundation work", stage: "during" },
-    ],
-    warranty: {
-      years: 10,
-      documents: ["warranty-cert.pdf"],
-    },
+      { name: "Plasterboard (12.5mm)", quantity: 24, unit: "sheets", inStock: true, location: "Unit 1 - B1" },
+      { name: "Timber Joists (4x2)", quantity: 12, unit: "lengths", inStock: true, location: "Unit 1 - A3" },
+      { name: "Insulation Rolls", quantity: 8, unit: "rolls", inStock: false }
+    ]
   };
 
-  const statusColors: Record<string, string> = {
-    lead: "bg-yellow-100 text-yellow-800",
-    quoted: "bg-blue-100 text-blue-800",
-    scheduled: "bg-purple-100 text-purple-800",
-    "in-progress": "bg-orange-100 text-orange-800",
-    completed: "bg-green-100 text-green-800",
-    "on-hold": "bg-gray-100 text-gray-800",
-  };
-
-  const priorityColors: Record<string, string> = {
-    low: "bg-gray-100 text-gray-800",
-    medium: "bg-blue-100 text-blue-800",
-    high: "bg-orange-100 text-orange-800",
-    urgent: "bg-red-100 text-red-800",
-  };
-
-  const handleOpenMaps = () => {
-    const address = encodeURIComponent(job.address);
-    // Detect mobile device
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-      // Try Apple Maps first on iOS, then Google Maps
-      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isIOS) {
-        window.location.href = `maps://maps.apple.com/?q=${address}`;
-      } else {
-        window.location.href = `geo:0,0?q=${address}`;
-      }
-    } else {
-      // Desktop - open Google Maps
-      window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, "_blank");
+  useEffect(() => {
+    if (id) {
+      fetchPurchaseOrders();
+      fetchTimeLogs();
     }
-  };
+  }, [id]);
+
+  async function fetchPurchaseOrders() {
+    const jobId = id as string;
+    if (!jobId) return;
+
+    const { data, error } = await supabase
+      .from("purchase_orders")
+      .select("*")
+      .eq("job_id", jobId)
+      .order("order_date", { ascending: false });
+
+    if (data) {
+      setPurchaseOrders(data.map(po => ({
+        id: po.id,
+        order_number: po.po_number || "PO-" + po.id.substring(0,4),
+        supplier: po.supplier || "Unknown",
+        items_description: typeof po.items === 'string' ? po.items : JSON.stringify(po.items || ""),
+        total_amount: po.total_amount || 0,
+        order_date: po.order_date || po.created_at || "",
+        status: po.status || "ordered"
+      })));
+    }
+    setLoading(false);
+  }
+
+  async function fetchTimeLogs() {
+    const jobId = id as string;
+    if (!jobId) return;
+
+    const { data, error } = await supabase
+      .from("time_logs")
+      .select(`
+        *,
+        profiles!time_logs_user_id_fkey(full_name)
+      `)
+      .eq("job_id", jobId)
+      .order("log_date", { ascending: false });
+
+    if (data) {
+      setTimeLogs(data.map(log => {
+        // Handle joined profile data safely
+        let staffName = "Staff";
+        if (log.profiles) {
+          // If it's an array, take first item, if object, take it directly
+          const profile = Array.isArray(log.profiles) ? log.profiles[0] : log.profiles;
+          staffName = profile?.full_name || "Staff";
+        }
+
+        return {
+          id: log.id,
+          date: log.log_date || log.created_at || "",
+          staff_name: staffName,
+          hours_worked: log.hours_worked || 0,
+          task_description: log.work_description || ""
+        };
+      }));
+    }
+  }
+
+  async function addPurchaseOrder() {
+    const jobId = id as string;
+    if (!jobId || !newPO.supplier || !newPO.items || !newPO.amount) return;
+
+    const { data, error } = await supabase
+      .from("purchase_orders")
+      .insert({
+        job_id: jobId,
+        supplier: newPO.supplier,
+        items: newPO.items,
+        total_amount: parseFloat(newPO.amount),
+        status: "ordered",
+        po_number: "PO-" + Math.floor(Math.random() * 10000)
+      })
+      .select()
+      .single();
+
+    if (data) {
+      const newFormattedPO = {
+        id: data.id,
+        order_number: data.po_number || "",
+        supplier: data.supplier || "",
+        items_description: typeof data.items === 'string' ? data.items : "Items",
+        total_amount: data.total_amount || 0,
+        order_date: data.order_date || data.created_at || "",
+        status: data.status || "ordered"
+      };
+      setPurchaseOrders([newFormattedPO, ...purchaseOrders]);
+      setNewPO({ supplier: "", items: "", amount: "" });
+    }
+  }
+
+  async function addTimeLog() {
+    const jobId = id as string;
+    if (!jobId || !newTimeLog.staff || !newTimeLog.hours || !newTimeLog.task) return;
+
+    // Get current user to link the log to them
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("time_logs")
+      .insert({
+        job_id: jobId,
+        user_id: user.id,
+        hours_worked: parseFloat(newTimeLog.hours),
+        work_description: newTimeLog.task,
+        log_date: new Date().toISOString().split('T')[0]
+      })
+      .select()
+      .single();
+
+    if (data) {
+      const newFormattedLog = {
+        id: data.id,
+        date: data.log_date || data.created_at || "",
+        staff_name: newTimeLog.staff,
+        hours_worked: data.hours_worked || 0,
+        task_description: data.work_description || ""
+      };
+      setTimeLogs([newFormattedLog, ...timeLogs]);
+      setNewTimeLog({ staff: "", hours: "", task: "" });
+    }
+  }
+
+  const totalSpent = purchaseOrders.reduce((sum, po) => sum + po.total_amount, 0);
+  const totalHours = timeLogs.reduce((sum, log) => sum + log.hours_worked, 0);
 
   return (
     <DashboardLayout>
-      <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="mb-8">
-          <div className="flex items-start justify-between">
+      <SEO title={`${job.title} - Job Details`} />
+      
+      <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => router.push("/jobs")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-heading font-bold text-foreground">{job.title}</h1>
-                <Badge className={statusColors[job.status]}>
-                  {job.status.replace("-", " ")}
-                </Badge>
-                <Badge variant="outline" className={priorityColors[job.priority]}>
-                  {job.priority}
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-3xl font-bold text-foreground">{job.title}</h1>
+                <Badge className={
+                  job.status === "in_progress" ? "bg-orange-100 text-orange-800 border-orange-200" :
+                  job.status === "completed" ? "bg-green-100 text-green-800 border-green-200" :
+                  "bg-blue-100 text-blue-800 border-blue-200"
+                }>
+                  {job.status.replace('_', ' ').toUpperCase()}
                 </Badge>
               </div>
-              <p className="text-muted-foreground font-mono">#{job.jobNumber}</p>
+              <p className="text-sm text-muted-foreground font-mono">{job.jobNumber}</p>
             </div>
-            <div className="flex gap-2">
-              <Link href={`/jobs/${id}/sheet`}>
-                <Button variant="outline">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Job Sheet
-                </Button>
-              </Link>
-              <Button>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Job
+          </div>
+          <div className="flex gap-2">
+            <Link href={`/jobs/${job.id}/sheet`}>
+              <Button variant="outline">
+                <FileText className="w-4 h-4 mr-2" />
+                Job Sheet
               </Button>
-            </div>
+            </Link>
+            <Button>
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Job
+            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Customer</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="font-semibold mb-2">{job.customer.name}</p>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Mail className="h-4 w-4" />
-                  <a href={`mailto:${job.customer.email}`} className="hover:text-primary">
-                    {job.customer.email}
-                  </a>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Progress</p>
+                  <h3 className="text-2xl font-bold">{job.progress}%</h3>
                 </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Phone className="h-4 w-4" />
-                  <a href={`tel:${job.customer.phone}`} className="hover:text-primary">
-                    {job.customer.phone}
-                  </a>
-                </div>
+                <CheckCircle2 className="w-8 h-8 text-green-500" />
               </div>
-              <Link href={`/customers/${job.customerId}`}>
-                <Button variant="outline" size="sm" className="w-full mt-4">
-                  View Profile
-                </Button>
-              </Link>
+              <Progress value={job.progress} className="mt-3" />
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Location</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-muted-foreground mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm text-muted-foreground">Site Address</p>
-                  <p className="font-medium text-sm">{job.address}</p>
-                  <div className="mt-2">
-                    <MapLauncher address={job.address} />
-                  </div>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Estimated Value</p>
+                  <h3 className="text-2xl font-bold">£{(job.estimatedValue).toLocaleString()}</h3>
                 </div>
+                <Receipt className="w-8 h-8 text-blue-500" />
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Timeline</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Start Date</p>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <p className="font-medium">{job.startDate.toLocaleDateString("en-GB")}</p>
-                  </div>
+                  <p className="text-sm text-muted-foreground">Total Spent</p>
+                  <h3 className="text-2xl font-bold">£{totalSpent.toLocaleString()}</h3>
                 </div>
+                <Package className="w-8 h-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Estimated Completion</p>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <p className="font-medium">{job.endDate.toLocaleDateString("en-GB")}</p>
-                  </div>
+                  <p className="text-sm text-muted-foreground">Hours Logged</p>
+                  <h3 className="text-2xl font-bold">{totalHours}h</h3>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Hours Progress</p>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <p className="font-medium">{job.actualHours} / {job.estimatedHours} hours</p>
-                  </div>
-                </div>
+                <Clock className="w-8 h-8 text-purple-500" />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="team">Team</TabsTrigger>
-            <TabsTrigger value="materials">Materials</TabsTrigger>
-            <TabsTrigger value="purchases">Purchase Orders</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="photos">Photos</TabsTrigger>
-          </TabsList>
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column */}
+          <div className="lg:col-span-2 space-y-6">
+            <Tabs defaultValue="details">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="materials">Materials</TabsTrigger>
+                <TabsTrigger value="purchases">Purchases</TabsTrigger>
+                <TabsTrigger value="time">Time Logs</TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="overview">
-            <Card>
-              <CardHeader>
-                <CardTitle>Job Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-6">{job.description}</p>
-                
-                <div className="mb-6">
-                  <h3 className="font-semibold mb-3">Progress</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Overall Completion</span>
-                      <span className="font-medium">{Math.round((job.actualHours / job.estimatedHours) * 100)}%</span>
-                    </div>
-                    <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-orange-500 rounded-full transition-all"
-                        style={{ width: `${(job.actualHours / job.estimatedHours) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {job.warranty && (
-                  <div>
-                    <h3 className="font-semibold mb-2">Warranty</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {job.warranty.years} year warranty included
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="team">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Assigned Team</CardTitle>
-                  <Button size="sm">
-                    <Users className="mr-2 h-4 w-4" />
-                    Assign Member
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {job.assignedTeam.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Users className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{member.name}</p>
-                          <p className="text-sm text-muted-foreground">{member.role}</p>
-                        </div>
+              <TabsContent value="details" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Customer Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <User className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">{job.customer.name}</p>
+                        <p className="text-sm text-muted-foreground">Primary Contact</p>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="materials">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Materials List</CardTitle>
-                  <Button size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Material
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {job.materials.map((material) => (
-                    <div key={material.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Mail className="w-5 h-5 text-muted-foreground" />
+                      <a href={`mailto:${job.customer.email}`} className="text-sm text-primary hover:underline">
+                        {job.customer.email}
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Phone className="w-5 h-5 text-muted-foreground" />
+                      <a href={`tel:${job.customer.phone}`} className="text-sm text-primary hover:underline">
+                        {job.customer.phone}
+                      </a>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-5 h-5 text-muted-foreground mt-0.5" />
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{material.name}</p>
-                          {material.inStock && (
-                            <Badge className="bg-green-100 text-green-800 border-green-200">
-                              In Stock
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {material.quantity} {material.unit} 
-                          {material.supplier && !material.inStock && ` • Order from: ${material.supplier}`}
-                          {material.inStock && ` • Location: ${material.stockLocation}`}
-                        </p>
+                        <p className="text-sm">{job.customer.address}</p>
+                        <MapLauncher address={job.customer.address} className="mt-2" size="sm" />
                       </div>
-                      <div className="flex items-center gap-2">
-                        {!material.inStock ? (
-                          <Badge variant="outline" className="text-orange-600 border-orange-200">Needs Order</Badge>
-                        ) : (
-                          <Button variant="ghost" size="sm" className="text-blue-600">Take from Stock</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Schedule</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Start Date</span>
+                      <span className="font-medium">{new Date(job.dates.start).toLocaleDateString('en-GB')}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">End Date</span>
+                      <span className="font-medium">{new Date(job.dates.end).toLocaleDateString('en-GB')}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Estimated Duration</span>
+                      <span className="font-medium">{job.dates.estimated}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="materials">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Materials Required</CardTitle>
+                    <CardDescription>Items needed for this job with stock availability</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Material</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Location</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {job.materials.map((material, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{material.name}</TableCell>
+                            <TableCell>{material.quantity} {material.unit}</TableCell>
+                            <TableCell>
+                              {material.inStock ? (
+                                <Badge className="bg-green-100 text-green-800">In Stock</Badge>
+                              ) : (
+                                <Badge className="bg-orange-100 text-orange-800">Needs Order</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {material.location || "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="purchases">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Purchase Orders</CardTitle>
+                    <CardDescription>Track all purchases for this job</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="border rounded-lg p-4 space-y-3 bg-muted/50">
+                      <h4 className="font-semibold text-sm">Add New Purchase Order</h4>
+                      <div className="grid grid-cols-3 gap-3">
+                        <Input 
+                          placeholder="Supplier" 
+                          value={newPO.supplier}
+                          onChange={(e) => setNewPO({...newPO, supplier: e.target.value})}
+                        />
+                        <Input 
+                          placeholder="Items description" 
+                          value={newPO.items}
+                          onChange={(e) => setNewPO({...newPO, items: e.target.value})}
+                        />
+                        <div className="flex gap-2">
+                          <Input 
+                            type="number" 
+                            placeholder="Amount (£)" 
+                            value={newPO.amount}
+                            onChange={(e) => setNewPO({...newPO, amount: e.target.value})}
+                          />
+                          <Button onClick={addPurchaseOrder}>
+                            <Plus className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Supplier</TableHead>
+                          <TableHead>Items</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {purchaseOrders.map((po) => (
+                          <TableRow key={po.id}>
+                            <TableCell>{new Date(po.order_date).toLocaleDateString('en-GB')}</TableCell>
+                            <TableCell className="font-medium">{po.supplier}</TableCell>
+                            <TableCell className="text-sm">{po.items_description}</TableCell>
+                            <TableCell className="font-semibold">£{po.total_amount.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{po.status}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {purchaseOrders.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground">
+                              No purchase orders yet
+                            </TableCell>
+                          </TableRow>
                         )}
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="time">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Time Logs</CardTitle>
+                    <CardDescription>Track hours worked on this job</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="border rounded-lg p-4 space-y-3 bg-muted/50">
+                      <h4 className="font-semibold text-sm">Log Time Entry</h4>
+                      <div className="grid grid-cols-4 gap-3">
+                        <Input 
+                          placeholder="Staff name" 
+                          value={newTimeLog.staff}
+                          onChange={(e) => setNewTimeLog({...newTimeLog, staff: e.target.value})}
+                        />
+                        <Input 
+                          type="number" 
+                          placeholder="Hours" 
+                          value={newTimeLog.hours}
+                          onChange={(e) => setNewTimeLog({...newTimeLog, hours: e.target.value})}
+                        />
+                        <Input 
+                          placeholder="Task description" 
+                          value={newTimeLog.task}
+                          onChange={(e) => setNewTimeLog({...newTimeLog, task: e.target.value})}
+                        />
+                        <Button onClick={addTimeLog}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Log
                         </Button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          <TabsContent value="purchases">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Staff Member</TableHead>
+                          <TableHead>Hours</TableHead>
+                          <TableHead>Task</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {timeLogs.map((log) => (
+                          <TableRow key={log.id}>
+                            <TableCell>{new Date(log.date).toLocaleDateString('en-GB')}</TableCell>
+                            <TableCell className="font-medium">{log.staff_name}</TableCell>
+                            <TableCell className="font-semibold">{log.hours_worked}h</TableCell>
+                            <TableCell className="text-sm">{log.task_description}</TableCell>
+                          </TableRow>
+                        ))}
+                        {timeLogs.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">
+                              No time logged yet
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Right Column */}
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Purchase Orders</CardTitle>
-                  <Button size="sm">
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    New PO
-                  </Button>
-                </div>
+                <CardTitle>Assigned Team</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {job.purchaseOrders.map((po) => (
-                    <div key={po.id} className="p-4 border rounded-lg">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <p className="font-semibold">{po.poNumber}</p>
-                          <p className="text-sm text-muted-foreground">{po.supplier}</p>
-                        </div>
-                        <Badge variant={po.status === "received" ? "default" : "secondary"}>
-                          {po.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          Ordered: {po.dateOrdered.toLocaleDateString("en-GB")}
-                        </span>
-                        <span className="font-semibold">£{po.totalAmount.toLocaleString()}</span>
-                      </div>
+              <CardContent className="space-y-3">
+                {job.team.map((member) => (
+                  <div key={member.id} className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarImage src={member.avatar} />
+                      <AvatarFallback>{member.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-sm">{member.name}</p>
+                      <p className="text-xs text-muted-foreground">{member.role}</p>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="documents">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Documents</CardTitle>
-                  <Button size="sm">
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload
-                  </Button>
-                </div>
+                <CardTitle>Photos</CardTitle>
+                <CardDescription>Job progress documentation</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {job.documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-primary" />
-                        <div>
-                          <p className="font-medium">{doc.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Uploaded {doc.uploadedAt.toLocaleDateString("en-GB")}
-                          </p>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                <PhotoUpload jobId={id as string} />
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="photos">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Job Photos</CardTitle>
-                  <Button size="sm">
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Photos
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                      <img 
-                        src={`https://images.unsplash.com/photo-${1580000000000 + i}?w=400&h=400&fit=crop`} 
-                        alt={`Job site photo ${i}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );

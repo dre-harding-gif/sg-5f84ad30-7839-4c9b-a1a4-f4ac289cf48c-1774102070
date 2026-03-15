@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { getCurrentUserPermissions, UserPermissions } from "@/services/roleService";
+import { getUserPermissions, UserPermissions } from "@/services/roleService";
 
 interface PermissionGateProps {
   children: React.ReactNode;
@@ -15,7 +15,7 @@ export function PermissionGate({ children, require, fallback }: PermissionGatePr
 
   useEffect(() => {
     async function checkPermissions() {
-      const perms = await getCurrentUserPermissions();
+      const perms = await getUserPermissions();
       setPermissions(perms);
       setLoading(false);
 
