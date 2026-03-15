@@ -92,32 +92,34 @@ export default function CustomerPortal() {
 
   const loadCustomerJobs = async (customerId: string) => {
     try {
-      // Load jobs first with explicit any cast
-      const { data, error } = await supabase
+      // Load jobs first - bypass type checking completely
+      const jobsResponse = await supabase
         .from("jobs")
         .select("*")
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (jobsResponse.error) throw jobsResponse.error;
 
-      // Explicit cast to bypass type inference
-      const jobsData: any = data;
+      // Force cast the entire response to bypass type inference
+      const jobsData = (jobsResponse as any).data;
 
       if (jobsData && jobsData.length > 0) {
         const jobIds = jobsData.map((j: any) => j.id);
 
         // Load photos for these jobs
-        const { data: photosData } = await supabase
+        const photosResponse = await supabase
           .from("job_photos")
           .select("*")
           .in("job_id", jobIds);
+        const photosData = (photosResponse as any).data;
 
         // Load quotes for these jobs
-        const { data: quotesData } = await supabase
+        const quotesResponse = await supabase
           .from("quotes")
           .select("*")
           .in("job_id", jobIds);
+        const quotesData = (quotesResponse as any).data;
 
         const formattedJobs = jobsData.map((job: any) => ({
           id: job.id,
@@ -129,10 +131,10 @@ export default function CustomerPortal() {
           address: job.address || "No address",
           team_members: job.assigned_team || [],
           materials: job.materials || [],
-          photos: (photosData as any)?.filter((p: any) => p.job_id === job.id) || [],
+          photos: photosData?.filter((p: any) => p.job_id === job.id) || [],
           documents: [],
           messages: [],
-          estimated_cost: (quotesData as any)?.find((q: any) => q.job_id === job.id)?.total || job.estimated_cost || 0
+          estimated_cost: quotesData?.find((q: any) => q.job_id === job.id)?.total || job.estimated_cost || 0
         }));
 
         setJobs(formattedJobs);
