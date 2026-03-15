@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getUserPermissions, updateUserRole } from "@/services/roleService";
 import type { UserRole } from "@/services/roleService";
 import { PermissionGate } from "@/components/PermissionGate";
-import { inviteUser } from "@/services/authService";
+import { authService } from "@/services/authService";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -92,14 +92,14 @@ export default function TeamPage() {
     }
 
     setInviting(true);
-    const result = await inviteUser(inviteForm.email, inviteForm.fullName, inviteForm.role);
+    const result = await authService.inviteUser(inviteForm.email, inviteForm.fullName, inviteForm.role);
     setInviting(false);
 
-    if (result.success && result.password) {
+    if (result.success && result.tempPassword) {
       // Show success dialog with credentials
       setInvitedCredentials({
         email: inviteForm.email,
-        password: result.password
+        password: result.tempPassword
       });
       setSuccessDialogOpen(true);
       setInviteDialogOpen(false);
