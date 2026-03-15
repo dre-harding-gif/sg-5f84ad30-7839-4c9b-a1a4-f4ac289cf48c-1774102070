@@ -102,7 +102,8 @@ export default function CustomerPortal() {
       if (jobsError) throw jobsError;
 
       if (jobsData && jobsData.length > 0) {
-        const jobIds = jobsData.map(j => j.id);
+        const jobsList = jobsData as any[];
+        const jobIds = jobsList.map(j => j.id);
 
         // Load photos for these jobs
         const { data: photosData } = await supabase
@@ -116,7 +117,7 @@ export default function CustomerPortal() {
           .select("*")
           .in("job_id", jobIds);
 
-        const formattedJobs = jobsData.map(job => ({
+        const formattedJobs = jobsList.map(job => ({
           id: job.id,
           job_number: job.job_number || `JOB-${job.id.slice(0, 8)}`,
           status: job.status,
