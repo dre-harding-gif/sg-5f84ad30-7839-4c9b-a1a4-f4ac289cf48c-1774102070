@@ -16,7 +16,7 @@ interface PricingItem {
   price_min: number;
   price_max: number;
   unit: string;
-  estimated_time: string;
+  estimated_duration: string;
   notes: string;
 }
 
@@ -40,7 +40,7 @@ export default function PricingPage() {
       if (error) throw error;
 
       // Group by category
-      const grouped = (data || []).reduce((acc, item) => {
+      const grouped = (data || []).reduce((acc, item: any) => {
         if (!acc[item.category]) {
           acc[item.category] = [];
         }
@@ -132,7 +132,7 @@ export default function PricingPage() {
                             <TableCell className="font-semibold text-orange-600">
                               {formatPrice(item.price_min, item.price_max)} {item.unit}
                             </TableCell>
-                            <TableCell>{item.estimated_time}</TableCell>
+                            <TableCell>{item.estimated_duration}</TableCell>
                             <TableCell className="text-sm text-muted-foreground">{item.notes}</TableCell>
                           </TableRow>
                         ))}

@@ -18,8 +18,7 @@ interface FleetVehicle {
   year: number;
   mot_expiry: string;
   insurance_expiry: string;
-  assigned_to: string;
-  status: string;
+  assigned_driver: string;
   mileage: number;
   notes: string;
 }
@@ -29,10 +28,10 @@ interface Insurance {
   policy_type: string;
   provider: string;
   policy_number: string;
-  coverage_amount: string;
-  premium_annual: number;
+  coverage_amount: number;
+  annual_premium: number;
   start_date: string;
-  end_date: string;
+  renewal_date: string;
   status: string;
   notes: string;
 }
@@ -44,8 +43,8 @@ interface Bill {
   provider: string;
   amount: number;
   frequency: string;
-  next_payment: string;
-  last_payment: string;
+  due_date: string;
+  last_paid: string;
   status: string;
   notes: string;
 }
@@ -68,9 +67,9 @@ export default function CompanyAssetsPage() {
         supabase.from("company_bills").select("*").order("category")
       ]);
 
-      if (fleetRes.data) setFleet(fleetRes.data);
-      if (insuranceRes.data) setInsurances(insuranceRes.data);
-      if (billsRes.data) setBills(billsRes.data);
+      if (fleetRes.data) setFleet(fleetRes.data as FleetVehicle[]);
+      if (insuranceRes.data) setInsurances(insuranceRes.data as Insurance[]);
+      if (billsRes.data) setBills(billsRes.data as Bill[]);
     } catch (error) {
       console.error("Error fetching company data:", error);
     } finally {
@@ -154,7 +153,7 @@ export default function CompanyAssetsPage() {
                             <p className="font-bold text-primary">{vehicle.registration}</p>
                             <p className="text-xs text-muted-foreground">{vehicle.year} {vehicle.make} {vehicle.model}</p>
                           </TableCell>
-                          <TableCell>{vehicle.assigned_to}</TableCell>
+                          <TableCell>{vehicle.assigned_driver}</TableCell>
                           <TableCell>{new Date(vehicle.mot_expiry).toLocaleDateString('en-GB')}</TableCell>
                           <TableCell>{new Date(vehicle.insurance_expiry).toLocaleDateString('en-GB')}</TableCell>
                           <TableCell>{vehicle.mileage.toLocaleString()} mi</TableCell>
@@ -194,9 +193,9 @@ export default function CompanyAssetsPage() {
                           </div>
                           <p className="text-sm"><strong>Provider:</strong> {policy.provider}</p>
                           <p className="text-sm"><strong>Policy No:</strong> {policy.policy_number}</p>
-                          <p className="text-sm"><strong>Cover:</strong> {policy.coverage_amount}</p>
-                          <p className="text-sm"><strong>Premium:</strong> £{policy.premium_annual.toLocaleString()}/year</p>
-                          <p className="text-sm text-muted-foreground mt-2">Expires: {new Date(policy.end_date).toLocaleDateString('en-GB')}</p>
+                          <p className="text-sm"><strong>Cover:</strong> £{policy.coverage_amount.toLocaleString()}</p>
+                          <p className="text-sm"><strong>Premium:</strong> £{policy.annual_premium.toLocaleString()}/year</p>
+                          <p className="text-sm text-muted-foreground mt-2">Expires: {new Date(policy.renewal_date).toLocaleDateString('en-GB')}</p>
                         </div>
                         <Button variant="outline" size="sm" className="mt-4 w-full">
                           <Download className="w-4 h-4 mr-2" />
@@ -234,7 +233,7 @@ export default function CompanyAssetsPage() {
                             <Badge variant="secondary" className="font-normal">{bill.category}</Badge>
                           </TableCell>
                           <TableCell className="capitalize">{bill.frequency}</TableCell>
-                          <TableCell>{new Date(bill.next_payment).toLocaleDateString('en-GB')}</TableCell>
+                          <TableCell>{new Date(bill.due_date).toLocaleDateString('en-GB')}</TableCell>
                           <TableCell className="text-right font-bold">£{bill.amount.toFixed(2)}</TableCell>
                         </TableRow>
                       ))}

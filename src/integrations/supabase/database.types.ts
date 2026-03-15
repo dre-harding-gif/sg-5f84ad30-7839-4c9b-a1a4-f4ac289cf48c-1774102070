@@ -152,6 +152,7 @@ export type Database = {
       }
       inventory_items: {
         Row: {
+          assigned_to: string | null
           category: string
           created_at: string | null
           current_quantity: number | null
@@ -167,6 +168,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          assigned_to?: string | null
           category: string
           created_at?: string | null
           current_quantity?: number | null
@@ -182,6 +184,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          assigned_to?: string | null
           category?: string
           created_at?: string | null
           current_quantity?: number | null

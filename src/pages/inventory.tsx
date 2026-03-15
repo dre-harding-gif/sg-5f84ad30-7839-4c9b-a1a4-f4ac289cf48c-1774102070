@@ -16,14 +16,14 @@ interface InventoryItem {
   item_type: string;
   name: string;
   category: string;
-  current_stock: number;
+  current_quantity: number;
   unit: string;
   location: string;
   reorder_level: number;
   unit_cost: number;
   supplier: string;
   notes: string;
-  assigned_to: string | null;
+  assigned_to?: string;
 }
 
 export default function InventoryPage() {
@@ -48,8 +48,8 @@ export default function InventoryPage() {
       const materialsData = (data || []).filter(item => item.item_type === "material");
       const toolsData = (data || []).filter(item => item.item_type === "tool");
 
-      setMaterials(materialsData);
-      setTools(toolsData);
+      setMaterials(materialsData as InventoryItem[]);
+      setTools(toolsData as InventoryItem[]);
     } catch (error) {
       console.error("Error fetching inventory:", error);
     } finally {
@@ -58,8 +58,8 @@ export default function InventoryPage() {
   }
 
   const getStockStatus = (item: InventoryItem) => {
-    if (item.current_stock === 0) return "critical";
-    if (item.current_stock <= item.reorder_level) return "low";
+    if (item.current_quantity === 0) return "critical";
+    if (item.current_quantity <= item.reorder_level) return "low";
     return "good";
   };
 
@@ -149,7 +149,7 @@ export default function InventoryPage() {
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell className="text-muted-foreground">{item.location}</TableCell>
                           <TableCell>
-                            <span className="font-bold">{item.current_stock}</span> {item.unit}
+                            <span className="font-bold">{item.current_quantity}</span> {item.unit}
                             <span className="text-xs text-muted-foreground ml-1">(Min: {item.reorder_level})</span>
                           </TableCell>
                           <TableCell>
