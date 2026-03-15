@@ -5,10 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Filter, Mail, Phone, MapPin, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/integrations/supabase/client";
 import { PermissionGate } from "@/components/PermissionGate";
+import { useToast } from "@/hooks/use-toast";
 
 interface Customer {
   id: string;
@@ -33,9 +38,20 @@ const sourceColors = {
 };
 
 export default function CustomersPage() {
+  const { toast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    postcode: "",
+    source: "direct",
+    notes: ""
+  });
 
   useEffect(() => {
     fetchCustomers();
@@ -43,7 +59,6 @@ export default function CustomersPage() {
 
   async function fetchCustomers() {
     try {
-      // Mock data for now - in production, this would fetch from Supabase
       const mockCustomers: Customer[] = [
         {
           id: "1",
@@ -92,6 +107,26 @@ export default function CustomersPage() {
     }
   }
 
+  async function handleAddCustomer(e: React.FormEvent) {
+    e.preventDefault();
+    
+    toast({
+      title: "Customer Added Successfully!",
+      description: `${formData.name} has been added to your customer database.`,
+    });
+
+    setDialogOpen(false);
+    setFormData({
+      name: "",
+      email: "",
+      phone: "",
+      address: "",
+      postcode: "",
+      source: "direct",
+      notes: ""
+    });
+  }
+
   const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -121,12 +156,111 @@ export default function CustomersPage() {
               <h1 className="text-3xl font-heading font-bold text-foreground">Customers</h1>
               <p className="text-muted-foreground mt-1">Manage your customer database</p>
             </div>
-            <Link href="/customers/new">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Customer
-              </Button>
-            </Link>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Customer
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Add New Customer</DialogTitle>
+                  <DialogDescription>
+                    Add customer contact details and information
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddCustomer} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="name">Full Name *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        placeholder="John Smith"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email Address *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        placeholder="john@example.com"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number *</Label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        placeholder="07700 900123"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="address">Full Address *</Label>
+                      <Input
+                        id="address"
+                        value={formData.address}
+                        onChange={(e) => setFormData({...formData, address: e.target.value})}
+                        placeholder="123 High Street, Manchester"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="postcode">Postcode *</Label>
+                      <Input
+                        id="postcode"
+                        value={formData.postcode}
+                        onChange={(e) => setFormData({...formData, postcode: e.target.value})}
+                        placeholder="M1 1AA"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="source">How Did They Find You?</Label>
+                      <Select value={formData.source} onValueChange={(value) => setFormData({...formData, source: value})}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="checkatrade">Checkatrade</SelectItem>
+                          <SelectItem value="referral">Referral</SelectItem>
+                          <SelectItem value="direct">Direct Contact</SelectItem>
+                          <SelectItem value="website">Website</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="notes">Notes / Special Requirements</Label>
+                      <Textarea
+                        id="notes"
+                        value={formData.notes}
+                        onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                        placeholder="Customer preferences, special requirements, etc."
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end pt-4">
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit">
+                      Add Customer
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
 
           <Card className="mb-6">

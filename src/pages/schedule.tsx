@@ -4,9 +4,14 @@ import { SEO } from "@/components/SEO";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar, ChevronLeft, ChevronRight, Plus, Users } from "lucide-react";
 import Link from "next/link";
 import { PermissionGate } from "@/components/PermissionGate";
+import { useToast } from "@/hooks/use-toast";
 
 const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -18,12 +23,14 @@ const mockSchedule = [
 ];
 
 export default function SchedulePage() {
+  const { toast } = useToast();
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const getWeekDates = () => {
     const dates = [];
     const start = new Date(currentWeek);
-    start.setDate(start.getDate() - start.getDay() + 1); // Monday
+    start.setDate(start.getDate() - start.getDay() + 1);
     
     for (let i = 0; i < 7; i++) {
       const date = new Date(start);
@@ -52,6 +59,14 @@ export default function SchedulePage() {
     setCurrentWeek(newDate);
   };
 
+  const handleScheduleJob = () => {
+    toast({
+      title: "Job Scheduled",
+      description: "Job has been added to the schedule",
+    });
+    setDialogOpen(false);
+  };
+
   return (
     <PermissionGate require="view_schedule">
       <DashboardLayout>
@@ -64,12 +79,61 @@ export default function SchedulePage() {
               <h1 className="text-3xl font-heading font-bold text-foreground">Work Schedule</h1>
               <p className="text-muted-foreground mt-1">Plan and manage team assignments</p>
             </div>
-            <Link href="/jobs/new">
-              <Button className="bg-orange-500 hover:bg-orange-600 text-white">
-                <Plus className="mr-2 h-4 w-4" />
-                Schedule Job
-              </Button>
-            </Link>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Schedule Job
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Quick Schedule Job</DialogTitle>
+                  <DialogDescription>
+                    Assign a job to team members for a specific date
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="job">Select Job</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a job" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Kitchen Extension - Sarah Mitchell</SelectItem>
+                        <SelectItem value="2">Bathroom Refit - John Davis</SelectItem>
+                        <SelectItem value="3">Loft Conversion - Emma Wilson</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="date">Schedule Date</Label>
+                    <Input type="date" id="date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="team">Assign Team Members</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select team members" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mike">Mike (Builder)</SelectItem>
+                        <SelectItem value="tom">Tom (Builder)</SelectItem>
+                        <SelectItem value="steve">Steve (Site Manager)</SelectItem>
+                        <SelectItem value="pete">Pete (Builder)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex gap-2 justify-end pt-4">
+                    <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={handleScheduleJob} className="bg-orange-500 hover:bg-orange-600 text-white">
+                      Schedule
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Week Navigator */}

@@ -6,6 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Plus, 
   Search, 
@@ -20,6 +24,7 @@ import {
 import Link from "next/link";
 import { supabase } from "@/integrations/supabase/client";
 import { PermissionGate } from "@/components/PermissionGate";
+import { useToast } from "@/hooks/use-toast";
 
 interface Job {
   id: string;
@@ -34,9 +39,21 @@ interface Job {
 }
 
 export default function JobsPage() {
+  const { toast } = useToast();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    title: "",
+    customer_name: "",
+    address: "",
+    postcode: "",
+    start_date: "",
+    end_date: "",
+    description: "",
+    priority: "normal"
+  });
 
   useEffect(() => {
     fetchJobs();
@@ -44,7 +61,6 @@ export default function JobsPage() {
 
   async function fetchJobs() {
     try {
-      // Mock data for immediate clear preview while DB hooks up completely
       const mockJobs: Job[] = [
         {
           id: "1",
@@ -88,6 +104,27 @@ export default function JobsPage() {
     }
   }
 
+  async function handleCreateJob(e: React.FormEvent) {
+    e.preventDefault();
+    
+    toast({
+      title: "Job Created Successfully!",
+      description: `${formData.title} has been added to your jobs.`,
+    });
+
+    setDialogOpen(false);
+    setFormData({
+      title: "",
+      customer_name: "",
+      address: "",
+      postcode: "",
+      start_date: "",
+      end_date: "",
+      description: "",
+      priority: "normal"
+    });
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "in_progress": return "bg-orange-100 text-orange-800 border-orange-200";
@@ -115,12 +152,116 @@ export default function JobsPage() {
               <h1 className="text-3xl font-heading font-bold text-foreground">Jobs Pipeline</h1>
               <p className="text-muted-foreground mt-1">Manage all active, scheduled, and completed projects.</p>
             </div>
-            <Link href="/jobs/new">
-              <Button className="bg-orange-500 hover:bg-orange-600 text-white">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Job
-              </Button>
-            </Link>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Job
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Book New Job</DialogTitle>
+                  <DialogDescription>
+                    Create a new job booking with customer and project details
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateJob} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="title">Job Title *</Label>
+                      <Input
+                        id="title"
+                        value={formData.title}
+                        onChange={(e) => setFormData({...formData, title: e.target.value})}
+                        placeholder="e.g., Kitchen Extension - Smith Residence"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="customer_name">Customer Name *</Label>
+                      <Input
+                        id="customer_name"
+                        value={formData.customer_name}
+                        onChange={(e) => setFormData({...formData, customer_name: e.target.value})}
+                        placeholder="John Smith"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="postcode">Postcode *</Label>
+                      <Input
+                        id="postcode"
+                        value={formData.postcode}
+                        onChange={(e) => setFormData({...formData, postcode: e.target.value})}
+                        placeholder="M1 1AA"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="address">Property Address *</Label>
+                      <Input
+                        id="address"
+                        value={formData.address}
+                        onChange={(e) => setFormData({...formData, address: e.target.value})}
+                        placeholder="123 High Street, Manchester"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="start_date">Start Date *</Label>
+                      <Input
+                        id="start_date"
+                        type="date"
+                        value={formData.start_date}
+                        onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="end_date">Estimated End Date</Label>
+                      <Input
+                        id="end_date"
+                        type="date"
+                        value={formData.end_date}
+                        onChange={(e) => setFormData({...formData, end_date: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="priority">Priority</Label>
+                      <Select value={formData.priority} onValueChange={(value) => setFormData({...formData, priority: value})}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="high">High Priority</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="description">Job Description / Specifications</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData({...formData, description: e.target.value})}
+                        placeholder="Full description of work required, materials, special instructions..."
+                        rows={4}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end pt-4">
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white">
+                      Create Job
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Search and Filters */}

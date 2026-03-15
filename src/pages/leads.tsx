@@ -6,10 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus, Phone, Mail, MapPin, Clock, TrendingUp, Search, Plus } from "lucide-react";
 import { PermissionGate } from "@/components/PermissionGate";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Lead {
   id: string;
@@ -28,10 +33,25 @@ interface Lead {
 }
 
 export default function LeadsPage() {
+  const { toast } = useToast();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    customer_name: "",
+    email: "",
+    phone: "",
+    address: "",
+    postcode: "",
+    source: "checkatrade",
+    service_requested: "",
+    message: "",
+    budget_range: "",
+    urgency: "normal",
+    status: "new"
+  });
 
   useEffect(() => {
     fetchLeads();
@@ -50,6 +70,45 @@ export default function LeadsPage() {
       console.error("Error fetching leads:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleAddLead(e: React.FormEvent) {
+    e.preventDefault();
+    
+    try {
+      const { error } = await supabase
+        .from("leads")
+        .insert([formData]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Lead Added Successfully!",
+        description: `${formData.customer_name} has been added to your leads.`,
+      });
+
+      setDialogOpen(false);
+      setFormData({
+        customer_name: "",
+        email: "",
+        phone: "",
+        address: "",
+        postcode: "",
+        source: "checkatrade",
+        service_requested: "",
+        message: "",
+        budget_range: "",
+        urgency: "normal",
+        status: "new"
+      });
+      fetchLeads();
+    } catch (error: any) {
+      toast({
+        title: "Error Adding Lead",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   }
 
@@ -112,10 +171,156 @@ export default function LeadsPage() {
               <h1 className="text-3xl font-heading font-bold text-foreground">Lead Management</h1>
               <p className="text-muted-foreground mt-1">Track inquiries from Checkatrade, website, and referrals</p>
             </div>
-            <Button className="bg-orange-500 hover:bg-orange-600 text-white shrink-0">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Lead Manually
-            </Button>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-orange-500 hover:bg-orange-600 text-white shrink-0">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Lead Manually
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Add New Lead</DialogTitle>
+                  <DialogDescription>
+                    Capture customer enquiry details from Checkatrade, phone, or other sources
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddLead} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="customer_name">Customer Name *</Label>
+                      <Input
+                        id="customer_name"
+                        value={formData.customer_name}
+                        onChange={(e) => setFormData({...formData, customer_name: e.target.value})}
+                        placeholder="John Smith"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number *</Label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        placeholder="07700 900123"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        placeholder="john@example.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="source">Lead Source *</Label>
+                      <Select value={formData.source} onValueChange={(value) => setFormData({...formData, source: value})}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="checkatrade">Checkatrade</SelectItem>
+                          <SelectItem value="website">Website</SelectItem>
+                          <SelectItem value="referral">Referral</SelectItem>
+                          <SelectItem value="facebook">Facebook</SelectItem>
+                          <SelectItem value="instagram">Instagram</SelectItem>
+                          <SelectItem value="phone">Phone Call</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="service_requested">Service Required *</Label>
+                      <Select value={formData.service_requested} onValueChange={(value) => setFormData({...formData, service_requested: value})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select service" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="New Build">New Build</SelectItem>
+                          <SelectItem value="Extension">Extension</SelectItem>
+                          <SelectItem value="Renovation">Renovation</SelectItem>
+                          <SelectItem value="Loft Conversion">Loft Conversion</SelectItem>
+                          <SelectItem value="Kitchen Refit">Kitchen Refit</SelectItem>
+                          <SelectItem value="Bathroom Refit">Bathroom Refit</SelectItem>
+                          <SelectItem value="Roofing">Roofing</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="budget_range">Budget Range</Label>
+                      <Select value={formData.budget_range} onValueChange={(value) => setFormData({...formData, budget_range: value})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select budget" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Under £5k">Under £5k</SelectItem>
+                          <SelectItem value="£5k - £10k">£5k - £10k</SelectItem>
+                          <SelectItem value="£10k - £25k">£10k - £25k</SelectItem>
+                          <SelectItem value="£25k - £50k">£25k - £50k</SelectItem>
+                          <SelectItem value="£50k+">£50k+</SelectItem>
+                          <SelectItem value="Not Specified">Not Specified</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="address">Property Address</Label>
+                      <Input
+                        id="address"
+                        value={formData.address}
+                        onChange={(e) => setFormData({...formData, address: e.target.value})}
+                        placeholder="123 High Street, Manchester"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="postcode">Postcode</Label>
+                      <Input
+                        id="postcode"
+                        value={formData.postcode}
+                        onChange={(e) => setFormData({...formData, postcode: e.target.value})}
+                        placeholder="M1 1AA"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="urgency">Urgency</Label>
+                      <Select value={formData.urgency} onValueChange={(value) => setFormData({...formData, urgency: value})}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="high">High Priority</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="message">Customer Message / Requirements</Label>
+                      <Textarea
+                        id="message"
+                        value={formData.message}
+                        onChange={(e) => setFormData({...formData, message: e.target.value})}
+                        placeholder="Customer's specific requirements, notes from call, etc."
+                        rows={4}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end pt-4">
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white">
+                      Add Lead
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
 
           <div className="grid gap-4 md:grid-cols-6">
