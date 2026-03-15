@@ -26,39 +26,44 @@ export function Navigation() {
   const router = useRouter();
 
   return (
-    <nav className="w-64 bg-secondary text-white flex-shrink-0 border-r border-white/10">
-      <div className="p-4 space-y-1">
-        <div className="mb-6 pb-4 border-b border-white/10">
-          <p className="text-xs font-semibold text-white/60 uppercase tracking-wider">
-            Main Menu
-          </p>
+    <nav className="w-64 bg-secondary flex-shrink-0 border-r border-border flex flex-col">
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Building className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="font-bold text-lg text-foreground">Harding Homes</h1>
+            <p className="text-xs text-muted-foreground">Job Management</p>
+          </div>
         </div>
-        
+      </div>
+
+      <div className="flex-1 overflow-auto p-4 space-y-1">
         {navigation.map((item) => {
           const isActive = router.pathname === item.href;
           const Icon = item.icon;
           
           return (
-            <Link key={item.name} href={item.href}>
-              <Button
-                variant={isActive ? "secondary" : "ghost"}
-                className={`w-full justify-start gap-3 ${
-                  isActive 
-                    ? "bg-primary text-white hover:bg-primary/90" 
-                    : "text-white/80 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                <span className="font-medium">{item.name}</span>
-              </Button>
+            <Link key={item.name} href={item.href} passHref legacyBehavior>
+              <a>
+                <Button
+                  variant={isActive ? "default" : "ghost"}
+                  className="w-full justify-start gap-3"
+                  asChild
+                >
+                  <span>
+                    <Icon className="h-5 w-5" />
+                    <span className="font-medium">{item.name}</span>
+                  </span>
+                </Button>
+              </a>
             </Link>
           );
         })}
       </div>
       
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10 bg-secondary">
-        <div className="text-xs text-white/60 text-center">
-          <p className="font-semibold text-white mb-1">Harding Homes Ltd</p>
+      <div className="p-4 border-t border-border">
+        <div className="text-xs text-muted-foreground text-center">
+          <p className="font-semibold text-foreground mb-1">Harding Homes Ltd</p>
           <p>Building Excellence Since 2010</p>
         </div>
       </div>
