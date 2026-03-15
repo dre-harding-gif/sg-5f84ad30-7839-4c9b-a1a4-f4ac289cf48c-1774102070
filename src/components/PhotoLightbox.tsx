@@ -30,6 +30,34 @@ export function PhotoLightbox({
 }: PhotoLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
+  // Sync state if initialIndex changes when reopened
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentIndex(initialIndex);
+    }
+  }, [isOpen, initialIndex]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") {
+        setCurrentIndex((prev) => (prev > 0 ? prev - 1 : prev));
+      }
+      if (e.key === "ArrowRight") {
+        setCurrentIndex((prev) => (prev < photos.length - 1 ? prev + 1 : prev));
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "auto";
+    };
+  }, [isOpen, onClose, photos?.length]);
+
   if (!isOpen || photos.length === 0) return null;
 
   const currentPhoto = photos[currentIndex];
@@ -73,23 +101,6 @@ export function PhotoLightbox({
       }
     }
   };
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") onClose();
-    if (e.key === "ArrowLeft") goToPrevious();
-    if (e.key === "ArrowRight") goToNext();
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      document.addEventListener("keydown", handleKeyDown as any);
-      document.body.style.overflow = "hidden";
-    }
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown as any);
-      document.body.style.overflow = "auto";
-    };
-  }, [isOpen]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center">
