@@ -59,7 +59,7 @@ export default function CustomerPortal() {
       }
 
       // Load customer data
-      const customerResponse: any = await supabase
+      const customerResponse = await (supabase as any)
         .from("customers")
         .select("*")
         .eq("email", session.user.email)
@@ -93,7 +93,7 @@ export default function CustomerPortal() {
   const loadCustomerJobs = async (customerId: string) => {
     try {
       // Force bypass type checking by casting immediately after await
-      const jobsResult: any = await supabase
+      const jobsResult = await (supabase as any)
         .from("jobs")
         .select("*")
         .eq("customer_id", customerId)
@@ -107,7 +107,7 @@ export default function CustomerPortal() {
         const jobIds = jobsData.map((j: any) => j.id);
 
         // Load photos
-        const photosResult: any = await supabase
+        const photosResult = await (supabase as any)
           .from("job_photos")
           .select("*")
           .in("job_id", jobIds);
@@ -115,7 +115,7 @@ export default function CustomerPortal() {
         const photosData = photosResult.data || [];
 
         // Load quotes
-        const quotesResult: any = await supabase
+        const quotesResult = await (supabase as any)
           .from("quotes")
           .select("*")
           .in("job_id", jobIds);
@@ -157,7 +157,7 @@ export default function CustomerPortal() {
     if (!newMessage.trim() || !selectedJob || !customer) return;
 
     try {
-      const notificationResponse: any = await supabase
+      const notificationResponse = await (supabase as any)
         .from("notifications")
         .insert({
           customer_id: customer.id,
