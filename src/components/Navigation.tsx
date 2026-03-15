@@ -43,19 +43,14 @@ export function Navigation() {
           const Icon = item.icon;
           
           return (
-            <Link key={item.name} href={item.href} passHref legacyBehavior>
-              <a>
-                <Button
-                  variant={isActive ? "default" : "ghost"}
-                  className="w-full justify-start gap-3"
-                  asChild
-                >
-                  <span>
-                    <Icon className="h-5 w-5" />
-                    <span className="font-medium">{item.name}</span>
-                  </span>
-                </Button>
-              </a>
+            <Link key={item.name} href={item.href}>
+              <Button
+                variant={isActive ? "default" : "ghost"}
+                className="w-full justify-start gap-3"
+              >
+                <Icon className="h-5 w-5" />
+                <span className="font-medium">{item.name}</span>
+              </Button>
             </Link>
           );
         })}
