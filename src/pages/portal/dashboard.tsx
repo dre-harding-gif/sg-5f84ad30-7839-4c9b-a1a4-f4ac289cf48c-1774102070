@@ -93,31 +93,31 @@ export default function CustomerPortal() {
   const loadCustomerJobs = async (customerId: string) => {
     try {
       // Load jobs first
-      const { data: jobsData, error: jobsError } = await supabase
+      const { data: jobsData, error: jobsError } = await (supabase
         .from("jobs")
         .select("*")
         .eq("customer_id", customerId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false }) as any);
 
       if (jobsError) throw jobsError;
 
       if (jobsData && jobsData.length > 0) {
         const jobsList = jobsData as any[];
-        const jobIds = jobsList.map(j => j.id);
+        const jobIds = jobsList.map((j: any) => j.id);
 
         // Load photos for these jobs
-        const { data: photosData } = await supabase
+        const { data: photosData } = await (supabase
           .from("job_photos")
           .select("*")
-          .in("job_id", jobIds);
+          .in("job_id", jobIds) as any);
 
         // Load quotes for these jobs
-        const { data: quotesData } = await supabase
+        const { data: quotesData } = await (supabase
           .from("quotes")
           .select("*")
-          .in("job_id", jobIds);
+          .in("job_id", jobIds) as any);
 
-        const formattedJobs = jobsList.map(job => ({
+        const formattedJobs = jobsList.map((job: any) => ({
           id: job.id,
           job_number: job.job_number || `JOB-${job.id.slice(0, 8)}`,
           status: job.status,
@@ -127,10 +127,10 @@ export default function CustomerPortal() {
           address: job.address || "No address",
           team_members: job.assigned_team || [],
           materials: job.materials || [],
-          photos: photosData?.filter(p => p.job_id === job.id) || [],
+          photos: photosData?.filter((p: any) => p.job_id === job.id) || [],
           documents: [],
           messages: [],
-          estimated_cost: quotesData?.find(q => q.job_id === job.id)?.total || job.estimated_cost || 0
+          estimated_cost: quotesData?.find((q: any) => q.job_id === job.id)?.total || job.estimated_cost || 0
         }));
 
         setJobs(formattedJobs);
