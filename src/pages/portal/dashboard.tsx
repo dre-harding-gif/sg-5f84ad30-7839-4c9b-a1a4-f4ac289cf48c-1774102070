@@ -59,13 +59,13 @@ export default function CustomerPortal() {
       }
 
       // Load customer data
-      const { data: customerData } = await supabase
-        .from("customers" as any)
+      const customerResponse: any = await supabase
+        .from("customers")
         .select("*")
         .eq("email", session.user.email)
         .single();
 
-      if (!customerData) {
+      if (!customerResponse.data) {
         toast({
           title: "Access Denied",
           description: "No customer account found",
@@ -76,8 +76,8 @@ export default function CustomerPortal() {
         return;
       }
 
-      setCustomer(customerData);
-      await loadCustomerJobs(customerData.id);
+      setCustomer(customerResponse.data);
+      await loadCustomerJobs(customerResponse.data.id);
     } catch (error: any) {
       console.error("Auth error:", error);
       toast({
@@ -92,39 +92,35 @@ export default function CustomerPortal() {
 
   const loadCustomerJobs = async (customerId: string) => {
     try {
-      // Load jobs first - bypass type checking completely
-      const jobsQuery = supabase
+      // Force bypass type checking by casting immediately after await
+      const jobsResult: any = await supabase
         .from("jobs")
         .select("*")
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
-      
-      const jobsResponse: any = await jobsQuery;
 
-      if (jobsResponse.error) throw jobsResponse.error;
+      if (jobsResult.error) throw jobsResult.error;
 
-      const jobsData = jobsResponse.data;
+      const jobsData = jobsResult.data || [];
 
-      if (jobsData && jobsData.length > 0) {
+      if (jobsData.length > 0) {
         const jobIds = jobsData.map((j: any) => j.id);
 
-        // Load photos for these jobs
-        const photosQuery = supabase
+        // Load photos
+        const photosResult: any = await supabase
           .from("job_photos")
           .select("*")
           .in("job_id", jobIds);
         
-        const photosResponse: any = await photosQuery;
-        const photosData = photosResponse.data;
+        const photosData = photosResult.data || [];
 
-        // Load quotes for these jobs
-        const quotesQuery = supabase
+        // Load quotes
+        const quotesResult: any = await supabase
           .from("quotes")
           .select("*")
           .in("job_id", jobIds);
         
-        const quotesResponse: any = await quotesQuery;
-        const quotesData = quotesResponse.data;
+        const quotesData = quotesResult.data || [];
 
         const formattedJobs = jobsData.map((job: any) => ({
           id: job.id,
@@ -136,10 +132,10 @@ export default function CustomerPortal() {
           address: job.address || "No address",
           team_members: job.assigned_team || [],
           materials: job.materials || [],
-          photos: photosData?.filter((p: any) => p.job_id === job.id) || [],
+          photos: photosData.filter((p: any) => p.job_id === job.id),
           documents: [],
           messages: [],
-          estimated_cost: quotesData?.find((q: any) => q.job_id === job.id)?.total || job.estimated_cost || 0
+          estimated_cost: quotesData.find((q: any) => q.job_id === job.id)?.total || job.estimated_cost || 0
         }));
 
         setJobs(formattedJobs);
@@ -161,8 +157,8 @@ export default function CustomerPortal() {
     if (!newMessage.trim() || !selectedJob || !customer) return;
 
     try {
-      const { error } = await supabase
-        .from("notifications" as any)
+      const notificationResponse: any = await supabase
+        .from("notifications")
         .insert({
           customer_id: customer.id,
           job_id: selectedJob.id,
@@ -172,7 +168,7 @@ export default function CustomerPortal() {
           sent_at: new Date().toISOString()
         });
 
-      if (error) throw error;
+      if (notificationResponse.error) throw notificationResponse.error;
 
       toast({
         title: "Message Sent",
