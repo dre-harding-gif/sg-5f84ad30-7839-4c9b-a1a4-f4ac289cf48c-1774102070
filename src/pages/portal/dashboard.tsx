@@ -92,8 +92,8 @@ export default function CustomerPortal() {
 
   const loadCustomerJobs = async (customerId: string) => {
     try {
-      const { data: jobsData } = await supabase
-        .from("jobs")
+      const { data } = await supabase
+        .from("jobs" as any)
         .select(`
           *,
           job_photos(*),
@@ -102,8 +102,10 @@ export default function CustomerPortal() {
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
 
+      const jobsData = data as any[];
+
       if (jobsData) {
-        const formattedJobs = (jobsData as any[]).map(job => ({
+        const formattedJobs = jobsData.map(job => ({
           id: job.id,
           job_number: job.job_number || `JOB-${job.id.slice(0, 8)}`,
           status: job.status,
