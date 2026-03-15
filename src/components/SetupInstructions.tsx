@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import QRCode from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { 
   Smartphone, Monitor, Download, CheckCircle, Copy, 
   Share2, Users, FileText, QrCode, Apple, Chrome 
@@ -71,7 +71,7 @@ export function SetupInstructions() {
         <CardContent>
           <div className="flex flex-col md:flex-row gap-6 items-center">
             <div className="flex-shrink-0 bg-white p-6 rounded-lg border-2 border-dashed">
-              <QRCode
+              <QRCodeCanvas
                 id="qr-code"
                 value={appUrl || "https://your-app.vercel.app"}
                 size={200}
