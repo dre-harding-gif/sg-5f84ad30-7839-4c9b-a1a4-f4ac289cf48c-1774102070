@@ -498,6 +498,8 @@ export type Database = {
           final_price: number | null
           id: string
           job_number: string
+          latitude: number | null
+          longitude: number | null
           materials_needed: string | null
           notes: string | null
           postcode: string | null
@@ -521,6 +523,8 @@ export type Database = {
           final_price?: number | null
           id?: string
           job_number: string
+          latitude?: number | null
+          longitude?: number | null
           materials_needed?: string | null
           notes?: string | null
           postcode?: string | null
@@ -544,6 +548,8 @@ export type Database = {
           final_price?: number | null
           id?: string
           job_number?: string
+          latitude?: number | null
+          longitude?: number | null
           materials_needed?: string | null
           notes?: string | null
           postcode?: string | null
@@ -581,6 +587,8 @@ export type Database = {
           customer_name: string
           email: string | null
           id: string
+          latitude: number | null
+          longitude: number | null
           message: string | null
           notes: string | null
           phone: string
@@ -600,6 +608,8 @@ export type Database = {
           customer_name: string
           email?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           message?: string | null
           notes?: string | null
           phone: string
@@ -619,6 +629,8 @@ export type Database = {
           customer_name?: string
           email?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           message?: string | null
           notes?: string | null
           phone?: string

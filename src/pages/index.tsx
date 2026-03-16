@@ -80,7 +80,10 @@ export default function Dashboard() {
       // Load today's jobs
       const { data: jobsData } = await supabase
         .from("jobs")
-        .select("*")
+        .select(`
+          *,
+          profiles!jobs_customer_id_fkey(full_name)
+        `)
         .gte("start_date", today)
         .lte("start_date", today + "T23:59:59")
         .order("start_date", { ascending: true });
@@ -124,11 +127,21 @@ export default function Dashboard() {
       let monthlyRevenue = 0;
       if (completedJobsData) {
         completedJobsData.forEach(job => {
-          monthlyRevenue += parseFloat(job.final_price || job.quoted_price || "0");
+          monthlyRevenue += parseFloat(job.final_price?.toString() || job.quoted_price?.toString() || "0");
         });
       }
 
-      setTodayJobs(Array.isArray(jobsData) ? jobsData : []);
+      const formattedTodayJobs = (jobsData || []).map((job: any) => ({
+        id: job.id,
+        title: job.title,
+        customer_name: job.profiles?.full_name || 'Unknown Customer',
+        address: job.address,
+        status: job.status,
+        assigned_team: job.assigned_team,
+        start_time: job.start_date
+      }));
+
+      setTodayJobs(formattedTodayJobs);
       setDailyTasks(Array.isArray(tasksData) ? tasksData : []);
       
       // Prepare map markers
