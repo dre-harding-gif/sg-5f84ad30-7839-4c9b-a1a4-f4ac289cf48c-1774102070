@@ -104,7 +104,7 @@ export default function Dashboard() {
 
       const { data: allLeads } = await supabase
         .from("leads")
-        .select("id, company_name, address, latitude, longitude")
+        .select("id, customer_name, address, latitude, longitude")
         .eq("status", "new");
 
       // Calculate stats
@@ -149,11 +149,11 @@ export default function Dashboard() {
       
       if (allJobs) {
         allJobs.forEach(job => {
-          if (job.latitude && job.longitude) {
+          if (job.latitude !== null && job.longitude !== null) {
             markers.push({
               id: job.id,
-              lat: parseFloat(job.latitude),
-              lng: parseFloat(job.longitude),
+              lat: Number(job.latitude),
+              lng: Number(job.longitude),
               title: job.title,
               type: 'job',
               address: job.address || ''
@@ -164,12 +164,12 @@ export default function Dashboard() {
 
       if (allLeads) {
         allLeads.forEach(lead => {
-          if (lead.latitude && lead.longitude) {
+          if (lead.latitude !== null && lead.longitude !== null) {
             markers.push({
               id: lead.id,
-              lat: parseFloat(lead.latitude),
-              lng: parseFloat(lead.longitude),
-              title: lead.company_name || 'New Enquiry',
+              lat: Number(lead.latitude),
+              lng: Number(lead.longitude),
+              title: lead.customer_name || 'New Enquiry',
               type: 'lead',
               address: lead.address || ''
             });
