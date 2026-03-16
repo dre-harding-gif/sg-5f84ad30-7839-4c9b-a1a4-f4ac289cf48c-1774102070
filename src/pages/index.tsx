@@ -504,34 +504,87 @@ export default function Dashboard() {
                 <MapPin className="h-16 w-16 mx-auto mb-3 opacity-50" />
                 <p className="text-lg mb-2">No locations to display</p>
                 <p className="text-sm">Jobs and enquiries with addresses will appear here</p>
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg text-left max-w-md mx-auto">
+                  <h4 className="font-semibold text-blue-900 mb-2">💡 How to add locations:</h4>
+                  <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                    <li>Go to Jobs or Leads page</li>
+                    <li>When adding an address, the system will auto-detect coordinates</li>
+                    <li>Locations will appear on this map automatically</li>
+                  </ol>
+                </div>
               </div>
             ) : (
-              <div className="relative w-full h-[500px] bg-muted rounded-lg overflow-hidden">
-                {/* Embedded Google Maps */}
-                <iframe
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  allowFullScreen
-                  referrerPolicy="no-referrer-when-downgrade"
-                  src={`https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&center=${mapMarkers[0]?.lat || 51.5074},${mapMarkers[0]?.lng || -0.1278}&zoom=11`}
-                ></iframe>
-                
-                {/* Map Legend Overlay */}
-                <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg">
-                  <h4 className="font-semibold mb-2 text-sm">Location Summary</h4>
-                  <div className="space-y-1 text-xs">
-                    {mapMarkers.slice(0, 5).map((marker) => (
-                      <div key={marker.id} className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${marker.type === 'job' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
-                        <span className="truncate max-w-[200px]">{marker.title}</span>
-                      </div>
-                    ))}
-                    {mapMarkers.length > 5 && (
-                      <p className="text-muted-foreground">+{mapMarkers.length - 5} more locations</p>
-                    )}
+              <div className="space-y-4">
+                {/* Map Visualization - Simple Grid Layout */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                  {/* Active Jobs Column */}
+                  <div className="space-y-2">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                      Active Jobs ({mapMarkers.filter(m => m.type === 'job').length})
+                    </h4>
+                    <div className="space-y-1 max-h-60 overflow-y-auto">
+                      {mapMarkers.filter(m => m.type === 'job').map((marker) => (
+                        <div 
+                          key={marker.id} 
+                          className="p-2 bg-white rounded border border-blue-200 hover:bg-blue-50 cursor-pointer transition-colors"
+                          onClick={() => router.push(`/jobs/${marker.id}`)}
+                        >
+                          <div className="flex items-start gap-2">
+                            <MapPin className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{marker.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">{marker.address}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {mapMarkers.filter(m => m.type === 'job').length === 0 && (
+                        <p className="text-sm text-muted-foreground py-4 text-center">No active jobs with locations</p>
+                      )}
+                    </div>
                   </div>
+
+                  {/* New Enquiries Column */}
+                  <div className="space-y-2">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      New Enquiries ({mapMarkers.filter(m => m.type === 'lead').length})
+                    </h4>
+                    <div className="space-y-1 max-h-60 overflow-y-auto">
+                      {mapMarkers.filter(m => m.type === 'lead').map((marker) => (
+                        <div 
+                          key={marker.id} 
+                          className="p-2 bg-white rounded border border-green-200 hover:bg-green-50 cursor-pointer transition-colors"
+                          onClick={() => router.push(`/leads`)}
+                        >
+                          <div className="flex items-start gap-2">
+                            <MapPin className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{marker.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">{marker.address}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {mapMarkers.filter(m => m.type === 'lead').length === 0 && (
+                        <p className="text-sm text-muted-foreground py-4 text-center">No new enquiries with locations</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Google Maps Integration */}
+                <div className="relative w-full h-[400px] bg-muted rounded-lg overflow-hidden border-2 border-border">
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    allowFullScreen
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src={`https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&center=${mapMarkers[0]?.lat || 51.5074},${mapMarkers[0]?.lng || -0.1278}&zoom=11`}
+                  ></iframe>
                 </div>
               </div>
             )}
