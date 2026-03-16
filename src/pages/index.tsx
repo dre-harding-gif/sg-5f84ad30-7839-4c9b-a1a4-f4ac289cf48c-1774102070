@@ -500,16 +500,29 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {mapMarkers.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground bg-muted rounded-lg">
-                <MapPin className="h-16 w-16 mx-auto mb-3 opacity-50" />
-                <p className="text-lg mb-2">No locations to display</p>
-                <p className="text-sm">Jobs and enquiries with addresses will appear here</p>
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg text-left max-w-md mx-auto">
-                  <h4 className="font-semibold text-blue-900 mb-2">💡 How to add locations:</h4>
-                  <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+              <div className="space-y-4">
+                {/* Always show live map of Berkshire */}
+                <div className="relative w-full h-[500px] bg-muted rounded-lg overflow-hidden border-2 border-border">
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    allowFullScreen
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src="https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&center=51.4543,0.9781&zoom=10"
+                  ></iframe>
+                  <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg max-w-sm">
+                    <h4 className="font-semibold text-sm mb-2">📍 Berkshire Area</h4>
+                    <p className="text-xs text-muted-foreground">Jobs and enquiries with addresses will appear as pins on this map</p>
+                  </div>
+                </div>
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-semibold text-blue-900 mb-2">💡 How to add locations to the map:</h4>
+                  <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside text-left max-w-md mx-auto">
                     <li>Go to Jobs or Leads page</li>
                     <li>When adding an address, the system will auto-detect coordinates</li>
-                    <li>Locations will appear on this map automatically</li>
+                    <li>Locations will appear as pins on this map automatically</li>
                   </ol>
                 </div>
               </div>
@@ -574,8 +587,8 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Google Maps Integration */}
-                <div className="relative w-full h-[400px] bg-muted rounded-lg overflow-hidden border-2 border-border">
+                {/* Live Google Maps */}
+                <div className="relative w-full h-[500px] bg-muted rounded-lg overflow-hidden border-2 border-border">
                   <iframe
                     width="100%"
                     height="100%"
@@ -583,7 +596,7 @@ export default function Dashboard() {
                     loading="lazy"
                     allowFullScreen
                     referrerPolicy="no-referrer-when-downgrade"
-                    src={`https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&center=${mapMarkers[0]?.lat || 51.5074},${mapMarkers[0]?.lng || -0.1278}&zoom=11`}
+                    src={`https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&center=${mapMarkers[0]?.lat || 51.4543},${mapMarkers[0]?.lng || -0.9781}&zoom=11`}
                   ></iframe>
                 </div>
               </div>
