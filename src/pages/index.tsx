@@ -3,379 +3,274 @@ import { useRouter } from "next/router";
 import { SEO } from "@/components/SEO";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { StatsCards } from "@/components/dashboard/StatsCards";
-import { RecentJobs } from "@/components/dashboard/RecentJobs";
-import { UpcomingJobs } from "@/components/dashboard/UpcomingJobs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { 
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  AreaChart, Area, ComposedChart
-} from "recharts";
-import { TrendingUp, TrendingDown, DollarSign, Briefcase, Clock, CheckCircle, Users, Package, AlertCircle } from "lucide-react";
+  Calendar, Clock, CheckCircle, MapPin, Plus, Trash2,
+  Briefcase, Users, TrendingUp, DollarSign, AlertCircle
+} from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+
+interface TodayJob {
+  id: string;
+  title: string;
+  customer_name: string;
+  address: string;
+  status: string;
+  assigned_team?: string[];
+  start_time?: string;
+}
+
+interface DailyTask {
+  id: string;
+  title: string;
+  description?: string;
+  priority: string;
+  status: string;
+  assigned_to?: string;
+  due_date: string;
+}
+
+interface MapMarker {
+  id: string;
+  lat: number;
+  lng: number;
+  title: string;
+  type: 'job' | 'lead';
+  address: string;
+}
 
 export default function Dashboard() {
   const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [todayJobs, setTodayJobs] = useState<TodayJob[]>([]);
+  const [dailyTasks, setDailyTasks] = useState<DailyTask[]>([]);
+  const [mapMarkers, setMapMarkers] = useState<MapMarker[]>([]);
   const [stats, setStats] = useState({
     activeJobs: 0,
     newLeads: 0,
-    scheduledThisWeek: 0,
-    monthlyRevenue: 0,
-    profitMargin: 0,
-    avgJobValue: 0,
-    monthlyGrowth: 0,
-    teamMembers: 0,
-    completionRate: 0,
-    pendingPOs: 0,
-    lowStockItems: 0
+    todayJobs: 0,
+    monthlyRevenue: 0
   });
-  const [jobStatusData, setJobStatusData] = useState<any[]>([]);
-  const [revenueData, setRevenueData] = useState<any[]>([]);
-  const [teamPerformance, setTeamPerformance] = useState<any[]>([]);
-  const [leadConversionData, setLeadConversionData] = useState<any[]>([]);
-  const [weeklyJobsData, setWeeklyJobsData] = useState<any[]>([]);
-  const [inventoryCostData, setInventoryCostData] = useState<any[]>([]);
-  const [timeTrackingData, setTimeTrackingData] = useState<any[]>([]);
+
+  // Task dialog state
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [newTask, setNewTask] = useState({
+    title: "",
+    description: "",
+    priority: "medium" as "high" | "medium" | "low",
+    due_date: new Date().toISOString().split('T')[0]
+  });
 
   useEffect(() => {
     loadDashboardData();
   }, []);
 
-  const loadDashboardData = async () => {
+  async function loadDashboardData() {
     try {
-      // Load all data in parallel from Supabase
-      const [
-        jobsResult, 
-        leadsResult, 
-        teamResult, 
-        inventoryResult,
-        purchaseOrdersResult,
-        timeLogsResult,
-        quotesResult
-      ] = await Promise.all([
-        supabase.from("jobs").select("*").order("created_at", { ascending: false }),
-        supabase.from("leads").select("*").order("created_at", { ascending: false }),
-        supabase.from("profiles").select("*").neq("role", "customer"),
-        supabase.from("inventory_items").select("*"),
-        supabase.from("purchase_orders").select("*"),
-        supabase.from("time_logs").select("*, jobs(title), profiles(full_name)"),
-        supabase.from("quotes").select("*")
-      ]);
+      const today = new Date().toISOString().split('T')[0];
 
-      const jobs = Array.isArray(jobsResult.data) ? jobsResult.data : [];
-      const leads = Array.isArray(leadsResult.data) ? leadsResult.data : [];
-      const team = Array.isArray(teamResult.data) ? teamResult.data : [];
-      const inventory = Array.isArray(inventoryResult.data) ? inventoryResult.data : [];
-      const purchaseOrders = Array.isArray(purchaseOrdersResult.data) ? purchaseOrdersResult.data : [];
-      const timeLogs = Array.isArray(timeLogsResult.data) ? timeLogsResult.data : [];
-      const quotes = Array.isArray(quotesResult.data) ? quotesResult.data : [];
+      // Load today's jobs
+      const { data: jobsData } = await supabase
+        .from("jobs")
+        .select("*")
+        .gte("start_date", today)
+        .lte("start_date", today + "T23:59:59")
+        .order("start_date", { ascending: true });
 
-      calculateStats(jobs, leads, team, purchaseOrders, inventory);
-      calculateJobStatusDistribution(jobs);
-      calculateMonthlyRevenue(jobs, purchaseOrders);
-      calculateTeamPerformance(jobs, team);
-      calculateLeadConversion(leads);
-      calculateWeeklyJobs(jobs);
-      calculateInventoryCosts(inventory, purchaseOrders);
-      calculateTimeTracking(timeLogs);
+      // Load daily tasks
+      const { data: tasksData } = await supabase
+        .from("daily_tasks")
+        .select("*")
+        .eq("due_date", today)
+        .order("priority", { ascending: false });
+
+      // Load all jobs and leads for map
+      const { data: allJobs } = await supabase
+        .from("jobs")
+        .select("id, title, address, latitude, longitude, status")
+        .neq("status", "completed")
+        .neq("status", "cancelled");
+
+      const { data: allLeads } = await supabase
+        .from("leads")
+        .select("id, company_name, address, latitude, longitude")
+        .eq("status", "new");
+
+      // Calculate stats
+      const { data: activeJobsData } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("status", "in_progress");
+
+      const { data: newLeadsData } = await supabase
+        .from("leads")
+        .select("*")
+        .eq("status", "new");
+
+      const { data: completedJobsData } = await supabase
+        .from("jobs")
+        .select("final_price, quoted_price")
+        .eq("status", "completed")
+        .gte("completed_date", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+
+      let monthlyRevenue = 0;
+      if (completedJobsData) {
+        completedJobsData.forEach(job => {
+          monthlyRevenue += parseFloat(job.final_price || job.quoted_price || "0");
+        });
+      }
+
+      setTodayJobs(Array.isArray(jobsData) ? jobsData : []);
+      setDailyTasks(Array.isArray(tasksData) ? tasksData : []);
       
+      // Prepare map markers
+      const markers: MapMarker[] = [];
+      
+      if (allJobs) {
+        allJobs.forEach(job => {
+          if (job.latitude && job.longitude) {
+            markers.push({
+              id: job.id,
+              lat: parseFloat(job.latitude),
+              lng: parseFloat(job.longitude),
+              title: job.title,
+              type: 'job',
+              address: job.address || ''
+            });
+          }
+        });
+      }
+
+      if (allLeads) {
+        allLeads.forEach(lead => {
+          if (lead.latitude && lead.longitude) {
+            markers.push({
+              id: lead.id,
+              lat: parseFloat(lead.latitude),
+              lng: parseFloat(lead.longitude),
+              title: lead.company_name || 'New Enquiry',
+              type: 'lead',
+              address: lead.address || ''
+            });
+          }
+        });
+      }
+
+      setMapMarkers(markers);
+
+      setStats({
+        activeJobs: activeJobsData?.length || 0,
+        newLeads: newLeadsData?.length || 0,
+        todayJobs: jobsData?.length || 0,
+        monthlyRevenue: Math.round(monthlyRevenue)
+      });
+
     } catch (error) {
       console.error("Dashboard data error:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const calculateStats = (jobs: any[], leads: any[], team: any[], purchaseOrders: any[], inventory: any[]) => {
-    const now = new Date();
-    const thisWeekStart = new Date(now.setDate(now.getDate() - now.getDay()));
-    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+  async function handleAddTask() {
+    if (!newTask.title) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a task title",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    // Active jobs (in-progress)
-    const activeJobs = jobs.filter(j => j.status === "in_progress").length;
+    const { error } = await supabase
+      .from("daily_tasks")
+      .insert([{
+        title: newTask.title,
+        description: newTask.description,
+        priority: newTask.priority,
+        status: "pending",
+        due_date: newTask.due_date
+      }]);
 
-    // New leads this week
-    const newLeads = leads.filter(l => {
-      const created = new Date(l.created_at);
-      return created >= thisWeekStart;
-    }).length;
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create task",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    // Scheduled this week
-    const scheduledThisWeek = jobs.filter(j => {
-      if (!j.start_date) return false;
-      const scheduled = new Date(j.start_date);
-      return scheduled >= thisWeekStart;
-    }).length;
-
-    // Monthly revenue and costs
-    let monthlyRevenue = 0;
-    let monthlyCosts = 0;
-    let completedJobs = 0;
-    let totalRevenue = 0;
-
-    jobs.forEach((job) => {
-      const created = new Date(job.created_at);
-      const jobRevenue = parseFloat(job.final_price || job.quoted_price || "0");
-      const jobCost = parseFloat(job.quoted_price || "0") * 0.6; // Estimated cost
-
-      if (job.status === "completed") {
-        totalRevenue += jobRevenue;
-        completedJobs++;
-      }
-
-      if (created >= thisMonthStart && job.status === "completed") {
-        monthlyRevenue += jobRevenue;
-        monthlyCosts += jobCost;
-      }
+    toast({
+      title: "Task Created",
+      description: "Daily task has been added"
     });
 
-    // Calculate metrics
-    const profitMargin = monthlyRevenue > 0 ? ((monthlyRevenue - monthlyCosts) / monthlyRevenue) * 100 : 0;
-    const avgJobValue = completedJobs > 0 ? totalRevenue / completedJobs : 0;
-
-    // Monthly growth
-    const thisMonthJobs = jobs.filter(j => {
-      const created = new Date(j.created_at);
-      return created >= thisMonthStart;
-    }).length;
-
-    const lastMonthJobs = jobs.filter(j => {
-      const created = new Date(j.created_at);
-      return created >= lastMonthStart && created <= lastMonthEnd;
-    }).length;
-
-    const monthlyGrowth = lastMonthJobs > 0 ? ((thisMonthJobs - lastMonthJobs) / lastMonthJobs) * 100 : 0;
-
-    // Completion rate
-    const totalJobs = jobs.length;
-    const completionRate = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0;
-
-    // Purchase orders pending
-    const pendingPOs = purchaseOrders.filter(po => po.status === "pending" || po.status === "ordered").length;
-
-    // Low stock items
-    const lowStockItems = inventory.filter(item => 
-      item.current_quantity <= item.reorder_level
-    ).length;
-
-    setStats({
-      activeJobs,
-      newLeads,
-      scheduledThisWeek,
-      monthlyRevenue: Math.round(monthlyRevenue),
-      profitMargin: Math.round(profitMargin),
-      avgJobValue: Math.round(avgJobValue),
-      monthlyGrowth: Math.round(monthlyGrowth),
-      teamMembers: team.length,
-      completionRate: Math.round(completionRate),
-      pendingPOs,
-      lowStockItems
+    setTaskDialogOpen(false);
+    setNewTask({
+      title: "",
+      description: "",
+      priority: "medium",
+      due_date: new Date().toISOString().split('T')[0]
     });
-  };
+    loadDashboardData();
+  }
 
-  const calculateJobStatusDistribution = (jobs: any[]) => {
-    const statusCounts: { [key: string]: number } = {};
+  async function toggleTaskComplete(taskId: string, currentStatus: string) {
+    const newStatus = currentStatus === "completed" ? "pending" : "completed";
     
-    jobs.forEach((job) => {
-      const status = job.status || "pending";
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-    });
+    const { error } = await supabase
+      .from("daily_tasks")
+      .update({ status: newStatus })
+      .eq("id", taskId);
 
+    if (!error) {
+      setDailyTasks(tasks => 
+        tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t)
+      );
+    }
+  }
+
+  async function deleteTask(taskId: string) {
+    const { error } = await supabase
+      .from("daily_tasks")
+      .delete()
+      .eq("id", taskId);
+
+    if (!error) {
+      setDailyTasks(tasks => tasks.filter(t => t.id !== taskId));
+      toast({
+        title: "Task Deleted",
+        description: "Task has been removed"
+      });
+    }
+  }
+
+  const getJobStatusColor = (status: string) => {
     const colors: { [key: string]: string } = {
-      pending: "#6b7280",
-      scheduled: "#3b82f6",
-      in_progress: "#f59e0b",
-      completed: "#10b981",
-      on_hold: "#8b5cf6",
-      cancelled: "#ef4444"
+      pending: "bg-gray-100 text-gray-800",
+      scheduled: "bg-blue-100 text-blue-800",
+      in_progress: "bg-orange-100 text-orange-800",
+      completed: "bg-green-100 text-green-800"
     };
-
-    const data = Object.entries(statusCounts).map(([status, count]) => ({
-      name: status.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
-      value: count,
-      color: colors[status] || "#6b7280"
-    }));
-
-    setJobStatusData(data);
+    return colors[status] || "bg-gray-100 text-gray-800";
   };
 
-  const calculateMonthlyRevenue = (jobs: any[], purchaseOrders: any[]) => {
-    const monthlyData: { [key: string]: { revenue: number, costs: number, count: number } } = {};
-    
-    // Calculate revenue from completed jobs
-    jobs.forEach((job) => {
-      const month = new Date(job.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" });
-      const revenue = job.status === "completed" ? parseFloat(job.final_price || job.quoted_price || "0") : 0;
-      
-      if (!monthlyData[month]) {
-        monthlyData[month] = { revenue: 0, costs: 0, count: 0 };
-      }
-      monthlyData[month].revenue += revenue;
-      if (job.status === "completed") {
-        monthlyData[month].count += 1;
-      }
-    });
-
-    // Calculate costs from purchase orders
-    purchaseOrders.forEach((po) => {
-      const month = new Date(po.order_date).toLocaleDateString("en-US", { month: "short", year: "numeric" });
-      const cost = parseFloat(po.total_amount || "0");
-      
-      if (monthlyData[month]) {
-        monthlyData[month].costs += cost;
-      }
-    });
-
-    const data = Object.entries(monthlyData)
-      .map(([month, values]) => ({
-        month,
-        revenue: Math.round(values.revenue),
-        costs: Math.round(values.costs),
-        profit: Math.round(values.revenue - values.costs),
-        jobs: values.count
-      }))
-      .slice(-6);
-
-    setRevenueData(data);
-  };
-
-  const calculateTeamPerformance = (jobs: any[], team: any[]) => {
-    const teamData: { [key: string]: { name: string, completed: number, active: number, hours: number } } = {};
-
-    team.forEach(member => {
-      teamData[member.id] = { 
-        name: member.full_name || member.email || "Unknown",
-        completed: 0, 
-        active: 0,
-        hours: 0
-      };
-    });
-
-    jobs.forEach(job => {
-      if (job.assigned_team && Array.isArray(job.assigned_team)) {
-        job.assigned_team.forEach((memberId: string) => {
-          if (teamData[memberId]) {
-            if (job.status === "completed") {
-              teamData[memberId].completed += 1;
-            } else if (job.status === "in_progress") {
-              teamData[memberId].active += 1;
-            }
-            teamData[memberId].hours += parseFloat(job.actual_hours || "0");
-          }
-        });
-      }
-    });
-
-    const data = Object.values(teamData)
-      .map((stats: any) => ({
-        name: stats.name.split(" ")[0],
-        completed: stats.completed,
-        active: stats.active,
-        hours: Math.round(stats.hours),
-        total: stats.completed + stats.active
-      }))
-      .filter(d => d.total > 0)
-      .slice(0, 5);
-
-    setTeamPerformance(data);
-  };
-
-  const calculateLeadConversion = (leads: any[]) => {
-    const monthlyData: { [key: string]: { total: number, converted: number } } = {};
-
-    leads.forEach(lead => {
-      const month = new Date(lead.created_at).toLocaleDateString("en-US", { month: "short" });
-      
-      if (!monthlyData[month]) {
-        monthlyData[month] = { total: 0, converted: 0 };
-      }
-      
-      monthlyData[month].total += 1;
-      if (lead.status === "won") {
-        monthlyData[month].converted += 1;
-      }
-    });
-
-    const data = Object.entries(monthlyData)
-      .map(([month, values]) => ({
-        month,
-        leads: values.total,
-        converted: values.converted,
-        rate: values.total > 0 ? Math.round((values.converted / values.total) * 100) : 0
-      }))
-      .slice(-6);
-
-    setLeadConversionData(data);
-  };
-
-  const calculateWeeklyJobs = (jobs: any[]) => {
-    const weeklyData: { [key: string]: number } = {
-      "Mon": 0, "Tue": 0, "Wed": 0, "Thu": 0, "Fri": 0, "Sat": 0, "Sun": 0
+  const getPriorityColor = (priority: string) => {
+    const colors: { [key: string]: string } = {
+      high: "bg-red-100 text-red-800 border-red-200",
+      medium: "bg-orange-100 text-orange-800 border-orange-200",
+      low: "bg-green-100 text-green-800 border-green-200"
     };
-
-    const now = new Date();
-    const thisWeekStart = new Date(now.setDate(now.getDate() - now.getDay()));
-
-    jobs.forEach(job => {
-      if (job.start_date) {
-        const scheduled = new Date(job.start_date);
-        if (scheduled >= thisWeekStart) {
-          const dayName = scheduled.toLocaleDateString("en-US", { weekday: "short" });
-          if (weeklyData[dayName] !== undefined) {
-            weeklyData[dayName] += 1;
-          }
-        }
-      }
-    });
-
-    const data = Object.entries(weeklyData).map(([day, count]) => ({
-      day,
-      jobs: count
-    }));
-
-    setWeeklyJobsData(data);
-  };
-
-  const calculateInventoryCosts = (inventory: any[], purchaseOrders: any[]) => {
-    const categories: { [key: string]: number } = {};
-
-    inventory.forEach(item => {
-      const category = item.category || "Other";
-      const value = (item.current_quantity || 0) * parseFloat(item.unit_cost || "0");
-      categories[category] = (categories[category] || 0) + value;
-    });
-
-    const data = Object.entries(categories)
-      .map(([category, value]) => ({
-        category,
-        value: Math.round(value)
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 6);
-
-    setInventoryCostData(data);
-  };
-
-  const calculateTimeTracking = (timeLogs: any[]) => {
-    const weeklyData: { [key: string]: number } = {};
-
-    timeLogs.forEach(log => {
-      const week = new Date(log.log_date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      weeklyData[week] = (weeklyData[week] || 0) + parseFloat(log.hours_worked || "0");
-    });
-
-    const data = Object.entries(weeklyData)
-      .map(([date, hours]) => ({
-        date,
-        hours: Math.round(hours * 10) / 10
-      }))
-      .slice(-7);
-
-    setTimeTrackingData(data);
+    return colors[priority] || "bg-gray-100 text-gray-800 border-gray-200";
   };
 
   if (loading) {
@@ -396,11 +291,22 @@ export default function Dashboard() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Overview of your business performance</p>
+          <p className="text-muted-foreground">Today's overview and activities</p>
         </div>
 
-        {/* Main Stats Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Top Stats */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Today's Jobs</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.todayJobs}</div>
+              <p className="text-xs text-muted-foreground">Scheduled for today</p>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
@@ -408,7 +314,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.activeJobs}</div>
-              <p className="text-xs text-muted-foreground mt-1">Currently in progress</p>
+              <p className="text-xs text-muted-foreground">In progress</p>
             </CardContent>
           </Card>
 
@@ -419,18 +325,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.newLeads}</div>
-              <p className="text-xs text-muted-foreground mt-1">This week</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.scheduledThisWeek}</div>
-              <p className="text-xs text-muted-foreground mt-1">This week</p>
+              <p className="text-xs text-muted-foreground">Awaiting contact</p>
             </CardContent>
           </Card>
 
@@ -441,461 +336,311 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">£{stats.monthlyRevenue.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                {stats.monthlyGrowth > 0 ? (
-                  <>
-                    <TrendingUp className="h-3 w-3 text-green-500" />
-                    <span className="text-green-500">+{stats.monthlyGrowth}% vs last month</span>
-                  </>
-                ) : stats.monthlyGrowth < 0 ? (
-                  <>
-                    <TrendingDown className="h-3 w-3 text-red-500" />
-                    <span className="text-red-500">{stats.monthlyGrowth}% vs last month</span>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">No change vs last month</span>
-                )}
-              </p>
+              <p className="text-xs text-muted-foreground">This month</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Secondary Metrics */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Daily Logs & Tasks Section */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Today's Jobs */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Profit Margin</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-blue-500" />
+                  Today's Jobs
+                </CardTitle>
+                <Button size="sm" onClick={() => router.push("/schedule")}>
+                  View All
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.profitMargin}%</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                {stats.profitMargin > 20 ? (
-                  <>
-                    <TrendingUp className="h-3 w-3 text-green-500" />
-                    <span className="text-green-500">Healthy margin</span>
-                  </>
-                ) : (
-                  <>
-                    <TrendingDown className="h-3 w-3 text-amber-500" />
-                    <span className="text-amber-500">Below target</span>
-                  </>
-                )}
-              </p>
+              {todayJobs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No jobs scheduled for today</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {todayJobs.map((job) => (
+                    <div 
+                      key={job.id} 
+                      className="p-3 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                      onClick={() => router.push(`/jobs/${job.id}`)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{job.title}</h4>
+                          <p className="text-sm text-muted-foreground">{job.customer_name}</p>
+                        </div>
+                        <Badge variant="outline" className={getJobStatusColor(job.status)}>
+                          {job.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-3 w-3" />
+                        <span className="truncate">{job.address}</span>
+                      </div>
+                      {job.start_time && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                          <Clock className="h-3 w-3" />
+                          <span>{job.start_time}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
+          {/* Daily Tasks Pin Board */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg Job Value</CardTitle>
-              <Briefcase className="h-4 w-4 text-muted-foreground" />
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-orange-500" />
+                  Daily Tasks
+                </CardTitle>
+                <Button size="sm" onClick={() => setTaskDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Task
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">£{stats.avgJobValue.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">Per completed job</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.pendingPOs}</div>
-              <p className="text-xs text-muted-foreground mt-1">Purchase orders</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
-              <AlertCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.lowStockItems}</div>
-              <p className="text-xs text-muted-foreground mt-1">Need reordering</p>
+              {dailyTasks.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No tasks for today</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-3"
+                    onClick={() => setTaskDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Create First Task
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {dailyTasks.map((task) => (
+                    <div 
+                      key={task.id} 
+                      className="p-3 border rounded-lg hover:bg-accent transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        <Checkbox 
+                          checked={task.status === "completed"}
+                          onCheckedChange={() => toggleTaskComplete(task.id, task.status)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className={`font-medium ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
+                              {task.title}
+                            </h4>
+                            <Badge variant="outline" className={getPriorityColor(task.priority)}>
+                              {task.priority}
+                            </Badge>
+                          </div>
+                          {task.description && (
+                            <p className="text-sm text-muted-foreground">{task.description}</p>
+                          )}
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => deleteTask(task.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="revenue" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="revenue">Financial</TabsTrigger>
-            <TabsTrigger value="jobs">Jobs</TabsTrigger>
-            <TabsTrigger value="team">Team</TabsTrigger>
-            <TabsTrigger value="leads">Leads</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="revenue" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue & Profit Trends (Last 6 Months)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={350}>
-                  <ComposedChart data={revenueData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value: number) => `£${value.toLocaleString()}`}
-                    />
-                    <Legend />
-                    <Area 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      fill="#10b981"
-                      fillOpacity={0.3}
-                      stroke="#10b981"
-                      name="Revenue"
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="costs" 
-                      fill="#ef4444"
-                      fillOpacity={0.3}
-                      stroke="#ef4444"
-                      name="Costs"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="profit" 
-                      stroke="#3b82f6" 
-                      strokeWidth={3}
-                      name="Profit"
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Monthly Jobs Completed</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={revenueData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="jobs" fill="#3b82f6" name="Jobs Completed" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Inventory Value by Category</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={inventoryCostData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="category" type="category" width={80} />
-                      <Tooltip formatter={(value: number) => `£${value.toLocaleString()}`} />
-                      <Bar dataKey="value" fill="#8b5cf6" name="Value" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+        {/* Interactive Map */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-green-500" />
+              Jobs & Enquiries Map
+            </CardTitle>
+            <div className="flex gap-4 mt-2">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span className="text-sm text-muted-foreground">Active Jobs ({mapMarkers.filter(m => m.type === 'job').length})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span className="text-sm text-muted-foreground">New Enquiries ({mapMarkers.filter(m => m.type === 'lead').length})</span>
+              </div>
             </div>
-          </TabsContent>
-
-          <TabsContent value="jobs" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>This Week's Schedule</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={weeklyJobsData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="day" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="jobs" fill="#f59e0b" name="Scheduled Jobs" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Job Status Distribution</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={jobStatusData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={(entry) => `${entry.name}: ${entry.value}`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {jobStatusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-
-            <RecentJobs />
-          </TabsContent>
-
-          <TabsContent value="team" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Team Performance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={teamPerformance}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="completed" fill="#10b981" name="Completed" />
-                      <Bar dataKey="active" fill="#f59e0b" name="Active" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Hours Logged (Last 7 Days)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={timeTrackingData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
-                      <Area 
-                        type="monotone" 
-                        dataKey="hours" 
-                        stroke="#3b82f6" 
-                        fill="#3b82f6"
-                        fillOpacity={0.6}
-                        name="Hours"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Team Members</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.teamMembers}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Active team members</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
-                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.completionRate}%</div>
-                  <p className="text-xs text-muted-foreground mt-1">Jobs completed</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Avg Hours/Job</CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {teamPerformance.length > 0 ? 
-                      Math.round(teamPerformance.reduce((acc, t) => acc + t.hours, 0) / teamPerformance.reduce((acc, t) => acc + t.total, 0)) 
-                      : 0}
+          </CardHeader>
+          <CardContent>
+            {mapMarkers.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground bg-muted rounded-lg">
+                <MapPin className="h-16 w-16 mx-auto mb-3 opacity-50" />
+                <p className="text-lg mb-2">No locations to display</p>
+                <p className="text-sm">Jobs and enquiries with addresses will appear here</p>
+              </div>
+            ) : (
+              <div className="relative w-full h-[500px] bg-muted rounded-lg overflow-hidden">
+                {/* Embedded Google Maps */}
+                <iframe
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={`https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&center=${mapMarkers[0]?.lat || 51.5074},${mapMarkers[0]?.lng || -0.1278}&zoom=11`}
+                ></iframe>
+                
+                {/* Map Legend Overlay */}
+                <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg">
+                  <h4 className="font-semibold mb-2 text-sm">Location Summary</h4>
+                  <div className="space-y-1 text-xs">
+                    {mapMarkers.slice(0, 5).map((marker) => (
+                      <div key={marker.id} className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${marker.type === 'job' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
+                        <span className="truncate max-w-[200px]">{marker.title}</span>
+                      </div>
+                    ))}
+                    {mapMarkers.length > 5 && (
+                      <p className="text-muted-foreground">+{mapMarkers.length - 5} more locations</p>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Per completed job</p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
+            )}
+            <div className="mt-4 flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => router.push("/jobs")}>
+                View All Jobs
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => router.push("/leads")}>
+                View All Leads
+              </Button>
             </div>
-          </TabsContent>
+          </CardContent>
+        </Card>
 
-          <TabsContent value="leads" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Lead Conversion Rate (Last 6 Months)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={350}>
-                  <ComposedChart data={leadConversionData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <Tooltip />
-                    <Legend />
-                    <Bar yAxisId="left" dataKey="leads" fill="#6b7280" name="Total Leads" />
-                    <Bar yAxisId="left" dataKey="converted" fill="#10b981" name="Converted" />
-                    <Line yAxisId="right" type="monotone" dataKey="rate" stroke="#3b82f6" strokeWidth={3} name="Conversion Rate %" />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+        {/* Quick Actions */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="cursor-pointer hover:bg-accent transition-colors" onClick={() => router.push("/jobs")}>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <Briefcase className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Manage Jobs</h3>
+                  <p className="text-sm text-muted-foreground">View and edit all jobs</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {leadConversionData.reduce((acc, d) => acc + d.leads, 0)}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Last 6 months</p>
-                </CardContent>
-              </Card>
+          <Card className="cursor-pointer hover:bg-accent transition-colors" onClick={() => router.push("/leads")}>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <TrendingUp className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">New Leads</h3>
+                  <p className="text-sm text-muted-foreground">Convert enquiries to jobs</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Converted</CardTitle>
-                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {leadConversionData.reduce((acc, d) => acc + d.converted, 0)}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Won leads</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Avg Conversion</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {leadConversionData.length > 0 ? 
-                      Math.round(leadConversionData.reduce((acc, d) => acc + d.rate, 0) / leadConversionData.length)
-                      : 0}%
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Conversion rate</p>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="inventory" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Inventory Value by Category</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={inventoryCostData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={true}
-                        label={(entry: any) => `${entry.category}: £${entry.value.toLocaleString()}`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {inventoryCostData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={`hsl(${index * 60}, 70%, 50%)`} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => `£${value.toLocaleString()}`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Stock Value by Category</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={inventoryCostData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="category" />
-                      <YAxis />
-                      <Tooltip formatter={(value: number) => `£${value.toLocaleString()}`} />
-                      <Bar dataKey="value" fill="#8b5cf6" name="Value (£)" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Stock Value</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    £{inventoryCostData.reduce((acc, d) => acc + d.value, 0).toLocaleString()}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Current inventory</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Low Stock Alerts</CardTitle>
-                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.lowStockItems}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Need reordering</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.pendingPOs}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Awaiting delivery</p>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
+          <Card className="cursor-pointer hover:bg-accent transition-colors" onClick={() => router.push("/team")}>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-orange-100 rounded-lg">
+                  <Users className="h-6 w-6 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Team</h3>
+                  <p className="text-sm text-muted-foreground">Manage team members</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* Add Task Dialog */}
+      <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Daily Task</DialogTitle>
+            <DialogDescription>
+              Create a task for today's to-do list
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Task Title *</Label>
+              <Input
+                id="title"
+                placeholder="e.g., Call supplier about materials"
+                value={newTask.title}
+                onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Textarea
+                id="description"
+                placeholder="Additional details..."
+                value={newTask.description}
+                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="priority">Priority</Label>
+              <select
+                id="priority"
+                className="w-full p-2 border rounded-md"
+                value={newTask.priority}
+                onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as any })}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setTaskDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddTask}
+                className="bg-orange-500 hover:bg-orange-600"
+              >
+                Add Task
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
