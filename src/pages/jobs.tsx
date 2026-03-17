@@ -39,6 +39,7 @@ interface Job {
   start_date: string;
   end_date: string;
   customer_name?: string;
+  customer_id?: string;
 }
 
 export default function JobsPage() {
@@ -166,7 +167,7 @@ export default function JobsPage() {
   async function createCustomerPortalAccess(jobId: string, customerId: string) {
     try {
       // Get customer details
-      const { data: customer, error: customerError } = await supabase
+      const { data: customer, error: customerError } = await (supabase as any)
         .from("customers")
         .select("*")
         .eq("id", customerId)

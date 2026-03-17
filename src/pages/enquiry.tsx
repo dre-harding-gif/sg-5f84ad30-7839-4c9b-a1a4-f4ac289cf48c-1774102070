@@ -28,21 +28,21 @@ export default function EnquiryForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    setLoading(true);
 
     try {
       // Save enquiry to database
       const { data, error } = await supabase
         .from("public_enquiries")
         .insert([{
-          full_name: formData.full_name,
+          full_name: formData.name,
           email: formData.email,
           phone: formData.phone,
           address: formData.address,
           postcode: formData.postcode,
           service_type: formData.service_type,
           message: formData.message,
-          enquiry_source: formData.enquiry_source,
+          enquiry_source: formData.source,
           status: "new"
         }])
         .select()
@@ -54,7 +54,7 @@ export default function EnquiryForm() {
       supabase.functions.invoke('ai-enquiry-response', {
         body: {
           enquiryId: data.id,
-          customerName: formData.full_name,
+          customerName: formData.name,
           customerEmail: formData.email,
           serviceType: formData.service_type,
           message: formData.message
@@ -69,7 +69,7 @@ export default function EnquiryForm() {
       alert("Failed to submit enquiry. Please try again or call us directly.");
       console.error(error);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
