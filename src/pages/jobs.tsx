@@ -19,7 +19,10 @@ import {
   Clock, 
   MoreVertical,
   Wrench,
-  CheckCircle2
+  CheckCircle2,
+  Copy,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,6 +57,9 @@ export default function JobsPage() {
     description: "",
     priority: "normal"
   });
+  const [portalDialogOpen, setPortalDialogOpen] = useState(false);
+  const [portalCredentials, setPortalCredentials] = useState({ email: "", password: "", portalUrl: "" });
+  const [showPortalPassword, setShowPortalPassword] = useState(false);
 
   useEffect(() => {
     fetchJobs();
@@ -122,6 +128,112 @@ export default function JobsPage() {
       end_date: "",
       description: "",
       priority: "normal"
+    });
+  }
+
+  async function handleStatusChange(jobId: string, newStatus: string) {
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .update({ status: newStatus })
+        .eq("id", jobId);
+
+      if (error) throw error;
+
+      // If job is accepted and has a customer, create portal access
+      if (newStatus === "active" || newStatus === "in progress") {
+        const job = jobs.find(j => j.id === jobId);
+        if (job?.customer_id) {
+          await createCustomerPortalAccess(jobId, job.customer_id);
+        }
+      }
+
+      toast({
+        title: "Status Updated",
+        description: `Job status changed to ${newStatus}`,
+      });
+
+      fetchJobs();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function createCustomerPortalAccess(jobId: string, customerId: string) {
+    try {
+      // Get customer details
+      const { data: customer, error: customerError } = await supabase
+        .from("customers")
+        .select("*")
+        .eq("id", customerId)
+        .single();
+
+      if (customerError || !customer) {
+        console.error("Customer not found:", customerError);
+        return;
+      }
+
+      // Call Edge Function to create portal account
+      const { data, error } = await supabase.functions.invoke('customer-portal-setup', {
+        body: {
+          customerEmail: customer.email,
+          customerName: customer.name,
+          customerId: customer.id,
+          jobId: jobId
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success && data.credentials) {
+        // Show success dialog with credentials
+        setPortalCredentials({
+          email: data.credentials.email,
+          password: data.credentials.password,
+          portalUrl: `${window.location.origin}/portal/login`
+        });
+        setPortalDialogOpen(true);
+
+        toast({
+          title: "Customer Portal Created",
+          description: "Share the login credentials with your customer",
+        });
+      }
+    } catch (error: any) {
+      console.error("Portal creation error:", error);
+      toast({
+        title: "Portal Setup Failed",
+        description: "Manual setup may be required",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function copyPortalCredentialsToClipboard() {
+    const credentials = `🏠 Harding Homes Customer Portal Access
+
+Your job has been accepted! Track progress online:
+
+Portal Login: ${portalCredentials.portalUrl}
+Email: ${portalCredentials.email}
+Temporary Password: ${portalCredentials.password}
+
+⚠️ IMPORTANT: Change your password after first login
+
+You can now:
+✅ Track job progress in real-time
+✅ View photos and updates
+✅ Message us directly
+✅ Access warranties and documents`;
+
+    navigator.clipboard.writeText(credentials);
+    toast({
+      title: "Copied to Clipboard",
+      description: "Share via WhatsApp, Email, or SMS"
     });
   }
 
@@ -352,6 +464,66 @@ export default function JobsPage() {
             )}
           </div>
         </div>
+
+        {/* Customer Portal Credentials Dialog */}
+        <Dialog open={portalDialogOpen} onOpenChange={setPortalDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-green-600">
+                <CheckCircle2 className="h-5 w-5" />
+                Customer Portal Created!
+              </DialogTitle>
+              <DialogDescription>
+                Share these credentials with your customer
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="bg-muted p-4 rounded-lg space-y-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Portal URL</Label>
+                  <p className="font-medium text-sm break-all">{portalCredentials.portalUrl}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Email</Label>
+                  <p className="font-medium">{portalCredentials.email}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Temporary Password</Label>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono font-medium">
+                      {showPortalPassword ? portalCredentials.password : "••••••••••••••••"}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPortalPassword(!showPortalPassword)}
+                    >
+                      {showPortalPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  ℹ️ Customer can track job progress, view photos, and message you directly through the portal
+                </p>
+              </div>
+
+              <Button
+                onClick={copyPortalCredentialsToClipboard}
+                className="w-full bg-blue-500 hover:bg-blue-600"
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copy Credentials to Clipboard
+              </Button>
+
+              <p className="text-xs text-muted-foreground text-center">
+                Share via WhatsApp, Email, SMS, or in person
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DashboardLayout>
     </PermissionGate>
   );

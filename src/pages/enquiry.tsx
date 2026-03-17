@@ -28,37 +28,48 @@ export default function EnquiryForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
 
     try {
-      const { error } = await supabase
+      // Save enquiry to database
+      const { data, error } = await supabase
         .from("public_enquiries")
         .insert([{
-          full_name: formData.name,
+          full_name: formData.full_name,
           email: formData.email,
           phone: formData.phone,
           address: formData.address,
           postcode: formData.postcode,
-          service_type: formData.service_type || 'other',
+          service_type: formData.service_type,
           message: formData.message,
+          enquiry_source: formData.enquiry_source,
           status: "new"
-        }]);
+        }])
+        .select()
+        .single();
 
       if (error) throw error;
 
+      // Trigger AI auto-response (fire and forget - don't wait)
+      supabase.functions.invoke('ai-enquiry-response', {
+        body: {
+          enquiryId: data.id,
+          customerName: formData.full_name,
+          customerEmail: formData.email,
+          serviceType: formData.service_type,
+          message: formData.message
+        }
+      }).catch(err => {
+        console.error("AI response failed:", err);
+        // Don't show error to user - AI is optional enhancement
+      });
+
       setSubmitted(true);
-      toast({
-        title: "Enquiry Submitted!",
-        description: "We'll be in touch within 24 hours.",
-      });
     } catch (error: any) {
-      toast({
-        title: "Submission Failed",
-        description: error.message,
-        variant: "destructive"
-      });
+      alert("Failed to submit enquiry. Please try again or call us directly.");
+      console.error(error);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
