@@ -34,14 +34,13 @@ export default function EnquiryForm() {
       const { error } = await supabase
         .from("public_enquiries")
         .insert([{
-          customer_name: formData.name,
+          full_name: formData.name,
           email: formData.email,
           phone: formData.phone,
           address: formData.address,
           postcode: formData.postcode,
-          service_type: formData.service_type || null,
+          service_type: formData.service_type || 'other',
           message: formData.message,
-          source: formData.source,
           status: "new"
         }]);
 

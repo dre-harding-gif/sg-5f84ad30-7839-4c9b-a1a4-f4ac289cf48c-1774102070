@@ -17,11 +17,11 @@ interface PurchaseOrder {
   id: string;
   po_number: string;
   job_id: string;
-  supplier_name: string;
-  description: string;
-  amount: number;
+  supplier: string;
+  total_amount: number;
   status: string;
   order_date: string;
+  notes?: string;
   jobs?: {
     title: string;
     job_number: string;
@@ -37,9 +37,8 @@ export default function PurchaseOrders() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [newPO, setNewPO] = useState({
     job_id: "",
-    supplier_name: "",
-    description: "",
-    amount: "",
+    supplier: "",
+    total_amount: "",
     notes: ""
   });
 
@@ -76,7 +75,7 @@ export default function PurchaseOrders() {
   }
 
   async function handleCreatePO() {
-    if (!newPO.job_id || !newPO.supplier_name || !newPO.amount) {
+    if (!newPO.job_id || !newPO.supplier || !newPO.total_amount) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields",
@@ -100,9 +99,8 @@ export default function PurchaseOrders() {
         .insert([{
           po_number: poNumber,
           job_id: newPO.job_id,
-          supplier_name: newPO.supplier_name,
-          description: newPO.description,
-          amount: parseFloat(newPO.amount),
+          supplier: newPO.supplier,
+          total_amount: parseFloat(newPO.total_amount),
           notes: newPO.notes || null,
           status: "pending"
         }]);
@@ -117,9 +115,8 @@ export default function PurchaseOrders() {
       setDialogOpen(false);
       setNewPO({
         job_id: "",
-        supplier_name: "",
-        description: "",
-        amount: "",
+        supplier: "",
+        total_amount: "",
         notes: ""
       });
       loadData();
@@ -217,7 +214,7 @@ export default function PurchaseOrders() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                £{purchaseOrders.reduce((sum, po) => sum + (po.amount || 0), 0).toLocaleString()}
+                £{purchaseOrders.reduce((sum, po) => sum + (po.total_amount || 0), 0).toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -270,7 +267,7 @@ export default function PurchaseOrders() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-bold">£{po.amount.toLocaleString()}</p>
+                        <p className="text-lg font-bold">£{po.total_amount.toLocaleString()}</p>
                         <p className="text-xs text-muted-foreground">
                           {new Date(po.order_date).toLocaleDateString()}
                         </p>
@@ -278,9 +275,9 @@ export default function PurchaseOrders() {
                     </div>
 
                     <div className="space-y-1 text-sm">
-                      <p><span className="font-medium">Supplier:</span> {po.supplier_name}</p>
-                      {po.description && (
-                        <p><span className="font-medium">Description:</span> {po.description}</p>
+                      <p><span className="font-medium">Supplier:</span> {po.supplier}</p>
+                      {po.notes && (
+                        <p><span className="font-medium">Notes:</span> {po.notes}</p>
                       )}
                     </div>
 
@@ -336,35 +333,24 @@ export default function PurchaseOrders() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="supplier_name">Supplier Name *</Label>
+              <Label htmlFor="supplier">Supplier Name *</Label>
               <Input
-                id="supplier_name"
+                id="supplier"
                 placeholder="e.g., Jewsons, Travis Perkins"
-                value={newPO.supplier_name}
-                onChange={(e) => setNewPO({ ...newPO, supplier_name: e.target.value })}
+                value={newPO.supplier}
+                onChange={(e) => setNewPO({ ...newPO, supplier: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description *</Label>
-              <Textarea
-                id="description"
-                placeholder="e.g., Bricks, cement, sand for foundation"
-                value={newPO.description}
-                onChange={(e) => setNewPO({ ...newPO, description: e.target.value })}
-                rows={3}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount (£) *</Label>
+              <Label htmlFor="total_amount">Amount (£) *</Label>
               <Input
-                id="amount"
+                id="total_amount"
                 type="number"
                 step="0.01"
                 placeholder="0.00"
-                value={newPO.amount}
-                onChange={(e) => setNewPO({ ...newPO, amount: e.target.value })}
+                value={newPO.total_amount}
+                onChange={(e) => setNewPO({ ...newPO, total_amount: e.target.value })}
               />
             </div>
 
