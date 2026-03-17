@@ -814,6 +814,54 @@ export type Database = {
         }
         Relationships: []
       }
+      public_enquiries: {
+        Row: {
+          address: string | null
+          ai_response: string | null
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          message: string | null
+          phone: string | null
+          postcode: string | null
+          preferred_contact: string | null
+          service_type: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          ai_response?: string | null
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          message?: string | null
+          phone?: string | null
+          postcode?: string | null
+          preferred_contact?: string | null
+          service_type: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          ai_response?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          message?: string | null
+          phone?: string | null
+          postcode?: string | null
+          preferred_contact?: string | null
+          service_type?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       purchase_orders: {
         Row: {
           created_at: string | null
