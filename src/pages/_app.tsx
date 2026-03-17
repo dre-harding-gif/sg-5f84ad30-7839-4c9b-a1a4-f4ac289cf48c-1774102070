@@ -11,9 +11,8 @@ function ServiceWorkerManager() {
 
   useEffect(() => {
     if (updateAvailable) {
-      if (confirm('A new version is available. Reload to update?')) {
-        updateServiceWorker();
-      }
+      // Silently update in background, don't prompt user
+      updateServiceWorker();
     }
   }, [updateAvailable, updateServiceWorker]);
 

@@ -1,26 +1,27 @@
-const CACHE_NAME = 'harding-homes-v1';
+const CACHE_NAME = 'harding-homes-v2';
 const OFFLINE_URL = '/offline';
 
-// Assets to cache on install
+// Critical assets only - minimal caching to avoid reload issues
 const STATIC_ASSETS = [
-  '/',
   '/offline',
   '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png',
 ];
 
-// Install event - cache static assets
+// Install event - cache only critical assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      return cache.addAll(STATIC_ASSETS).catch(err => {
+        console.log('Cache install error:', err);
+        return Promise.resolve();
+      });
     })
   );
+  // Force activation immediately
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -31,10 +32,11 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  self.clients.claim();
+  // Take control of all pages immediately
+  return self.clients.claim();
 });
 
-// Fetch event - network first, fallback to cache
+// Fetch event - Network-first strategy for better online experience
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
@@ -42,12 +44,31 @@ self.addEventListener('fetch', (event) => {
   // Skip chrome extensions and non-http(s) requests
   if (!event.request.url.startsWith('http')) return;
 
+  // Skip Supabase API calls - always use network
+  if (event.request.url.includes('supabase.co')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // Skip hot reload and development files
+  if (event.request.url.includes('/_next/') || 
+      event.request.url.includes('webpack') ||
+      event.request.url.includes('hot-update')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // Network-first strategy for everything else
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone the response before caching
+        // Don't cache if not ok
+        if (!response || response.status !== 200 || response.type === 'error') {
+          return response;
+        }
+
+        // Clone and cache successful responses
         const responseToCache = response.clone();
-        
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(event.request, responseToCache);
         });
@@ -55,6 +76,7 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
+        // Fallback to cache only when network fails
         return caches.match(event.request).then((cachedResponse) => {
           if (cachedResponse) {
             return cachedResponse;
@@ -65,7 +87,7 @@ self.addEventListener('fetch', (event) => {
             return caches.match(OFFLINE_URL);
           }
           
-          return new Response('Offline', {
+          return new Response('Offline - Network unavailable', {
             status: 503,
             statusText: 'Service Unavailable',
           });
@@ -74,7 +96,7 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Background sync for photo uploads
+// Background sync for offline data
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-photos') {
     event.waitUntil(syncPhotos());
@@ -85,91 +107,18 @@ self.addEventListener('sync', (event) => {
 });
 
 async function syncPhotos() {
-  const db = await openDatabase();
-  const photos = await getAllPendingPhotos(db);
-  
-  for (const photo of photos) {
-    try {
-      await uploadPhoto(photo);
-      await markPhotoAsSynced(db, photo.id);
-    } catch (error) {
-      console.error('Failed to sync photo:', error);
-    }
-  }
+  console.log('Syncing photos in background...');
+  // Photo sync logic will be handled by the app
 }
 
 async function syncData() {
-  // Sync any pending form data or updates
-  console.log('Syncing pending data...');
+  console.log('Syncing data in background...');
+  // Data sync logic will be handled by the app
 }
 
-function openDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('HardingHomesDB', 1);
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-    
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      
-      if (!db.objectStoreNames.contains('photos')) {
-        const photoStore = db.createObjectStore('photos', { keyPath: 'id', autoIncrement: true });
-        photoStore.createIndex('jobId', 'jobId', { unique: false });
-        photoStore.createIndex('synced', 'synced', { unique: false });
-      }
-      
-      if (!db.objectStoreNames.contains('jobs')) {
-        db.createObjectStore('jobs', { keyPath: 'id' });
-      }
-    };
-  });
-}
-
-function getAllPendingPhotos(db) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['photos'], 'readonly');
-    const store = transaction.objectStore('photos');
-    const index = store.index('synced');
-    const request = index.getAll(false);
-    
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-function markPhotoAsSynced(db, photoId) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['photos'], 'readwrite');
-    const store = transaction.objectStore('photos');
-    const request = store.get(photoId);
-    
-    request.onsuccess = () => {
-      const photo = request.result;
-      photo.synced = true;
-      const updateRequest = store.put(photo);
-      updateRequest.onsuccess = () => resolve();
-      updateRequest.onerror = () => reject(updateRequest.error);
-    };
-    
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function uploadPhoto(photo) {
-  // This will be replaced with actual Supabase upload when backend is connected
-  const formData = new FormData();
-  formData.append('file', photo.file);
-  formData.append('jobId', photo.jobId);
-  
-  const response = await fetch('/api/upload-photo', {
-    method: 'POST',
-    body: formData,
-  });
-  
-  if (!response.ok) {
-    throw new Error('Upload failed');
+// Handle messages from the app
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
-  
-  return response.json();
-}
+});
