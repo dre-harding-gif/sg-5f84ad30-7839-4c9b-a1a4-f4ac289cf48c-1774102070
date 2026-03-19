@@ -151,7 +151,7 @@ export default function TeamPage() {
 
   const handleResendInvite = async (member: TeamMember) => {
     try {
-      setIsLoading(true);
+      setResending(member.id);
       
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: {
@@ -216,7 +216,7 @@ export default function TeamPage() {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setResending(null);
     }
   };
 
