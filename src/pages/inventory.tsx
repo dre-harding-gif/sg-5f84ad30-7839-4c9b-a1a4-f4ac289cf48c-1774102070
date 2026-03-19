@@ -6,11 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Package, Wrench, AlertTriangle, Plus, Search, Hand, TrendingDown, BarChart3 } from "lucide-react";
 import { PermissionGate } from "@/components/PermissionGate";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { useToast } from "@/hooks/use-toast";
 
 const COLORS = ['#1e3a8a', '#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe'];
 
@@ -58,6 +60,36 @@ export default function InventoryPage() {
       console.error("Error fetching inventory:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  const { toast } = useToast();
+
+  async function handleConditionChange(toolId: string, newCondition: string) {
+    try {
+      const { error } = await supabase
+        .from("inventory_items")
+        .update({ condition: newCondition })
+        .eq("id", toolId);
+
+      if (error) throw error;
+
+      // Update local state
+      setTools(prev => prev.map(tool => 
+        tool.id === toolId ? { ...tool, condition: newCondition } : tool
+      ));
+
+      toast({
+        title: "Condition Updated",
+        description: "Tool condition has been successfully updated.",
+      });
+    } catch (error) {
+      console.error("Error updating condition:", error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update tool condition. Please try again.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -333,7 +365,50 @@ export default function InventoryPage() {
                         <TableRow key={tool.id}>
                           <TableCell className="font-medium">{tool.name}</TableCell>
                           <TableCell className="text-muted-foreground">{tool.location}</TableCell>
-                          <TableCell>{getConditionBadge(tool.condition)}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={tool.condition || "good"}
+                              onValueChange={(value) => handleConditionChange(tool.id, value)}
+                            >
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue>
+                                  {getConditionBadge(tool.condition)}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="excellent">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                                    Excellent
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="good">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                                    Good
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="fair">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                                    Fair
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="poor">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-orange-500" />
+                                    Poor
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="needs_repair">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                                    Needs Repair
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                           <TableCell>{tool.assigned_to || "In Stock"}</TableCell>
                           <TableCell>
                             {tool.assigned_to ? (
