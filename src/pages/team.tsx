@@ -149,48 +149,76 @@ export default function TeamPage() {
     }
   }
 
-  async function handleResendInvitation(member: TeamMember) {
-    setResending(member.id);
-    
+  const handleResendInvite = async (member: TeamMember) => {
     try {
+      setIsLoading(true);
+      
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: {
           email: member.email,
           fullName: member.full_name,
           role: member.role,
-          resend: true
-        }
+          resend: true,
+        },
       });
 
-      if (error) throw error;
-
-      if (data.success && data.tempPassword) {
-        setInvitedCredentials({
-          email: member.email,
-          password: data.tempPassword,
-          emailSent: data.emailSent || false
-        });
-        setSuccessDialogOpen(true);
-        
+      if (error) {
+        console.error('Edge Function error:', error);
         toast({
-          title: data.emailSent ? "✅ Invitation Resent!" : "✅ Credentials Reset",
-          description: data.emailSent 
-            ? `Email sent to ${member.email}` 
-            : "Share new credentials manually (SMTP not configured)"
+          title: "Error",
+          description: `Failed to resend invitation: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Log the full response for debugging
+      console.log('Invite response:', data);
+
+      if (!data.success) {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to resend invitation",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Show success message with email status
+      if (data.emailSent) {
+        toast({
+          title: "Invitation Sent!",
+          description: `✅ Password reset email sent to ${member.email}`,
         });
       } else {
-        throw new Error(data.error || "Failed to resend invitation");
+        // Show temporary password if email wasn't sent
+        toast({
+          title: "Invitation Ready",
+          description: (
+            <div className="space-y-2">
+              <p>⚠️ Email not configured. Share these credentials:</p>
+              <p className="font-mono text-xs bg-black/10 p-2 rounded">
+                Email: {member.email}<br/>
+                Password: {data.tempPassword}
+              </p>
+            </div>
+          ),
+          duration: 10000,
+        });
       }
-    } catch (error: any) {
+
+      await fetchTeamMembers();
+    } catch (err: any) {
+      console.error('Unexpected error:', err);
       toast({
-        title: "Resend Failed",
-        description: error.message || "Failed to resend invitation",
-        variant: "destructive"
+        title: "Error",
+        description: `Unexpected error: ${err.message || 'Please check console for details'}`,
+        variant: "destructive",
       });
     } finally {
-      setResending(null);
+      setIsLoading(false);
     }
-  }
+  };
 
   function copyCredentialsToClipboard() {
     const credentials = `Harding Homes Login Credentials
@@ -374,7 +402,7 @@ Login at: ${window.location.origin}
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => handleResendInvitation(member)}
+                              onClick={() => handleResendInvite(member)}
                               disabled={resending === member.id}
                               className="text-blue-600 border-blue-500 hover:bg-blue-50"
                             >
