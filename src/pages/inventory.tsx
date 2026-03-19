@@ -13,6 +13,15 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 const COLORS = ['#1e3a8a', '#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe'];
 
@@ -32,14 +41,29 @@ interface InventoryItem {
   condition?: string;
 }
 
+interface TeamMember {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+}
+
 export default function InventoryPage() {
   const [materials, setMaterials] = useState<InventoryItem[]>([]);
   const [tools, setTools] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [selectedTool, setSelectedTool] = useState<InventoryItem | null>(null);
+  const [selectedTeamMember, setSelectedTeamMember] = useState("");
+  const [returnCondition, setReturnCondition] = useState("");
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchInventory();
+    fetchTeamMembers();
   }, []);
 
   async function fetchInventory() {
@@ -63,7 +87,21 @@ export default function InventoryPage() {
     }
   }
 
-  const { toast } = useToast();
+  async function fetchTeamMembers() {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, role")
+        .in("role", ["builder", "site_manager", "subcontractor"])
+        .eq("status", "active")
+        .order("full_name");
+
+      if (error) throw error;
+      setTeamMembers(data as TeamMember[]);
+    } catch (error) {
+      console.error("Error fetching team members:", error);
+    }
+  }
 
   async function handleConditionChange(toolId: string, newCondition: string) {
     try {
@@ -74,7 +112,6 @@ export default function InventoryPage() {
 
       if (error) throw error;
 
-      // Update local state
       setTools(prev => prev.map(tool => 
         tool.id === toolId ? { ...tool, condition: newCondition } : tool
       ));
@@ -91,6 +128,102 @@ export default function InventoryPage() {
         variant: "destructive",
       });
     }
+  }
+
+  async function handleAssignTool() {
+    if (!selectedTool || !selectedTeamMember) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a team member.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("inventory_items")
+        .update({ assigned_to: selectedTeamMember })
+        .eq("id", selectedTool.id);
+
+      if (error) throw error;
+
+      setTools(prev => prev.map(tool => 
+        tool.id === selectedTool.id ? { ...tool, assigned_to: selectedTeamMember } : tool
+      ));
+
+      toast({
+        title: "Tool Assigned",
+        description: `${selectedTool.name} has been assigned successfully.`,
+      });
+
+      setAssignDialogOpen(false);
+      setSelectedTool(null);
+      setSelectedTeamMember("");
+    } catch (error) {
+      console.error("Error assigning tool:", error);
+      toast({
+        title: "Assignment Failed",
+        description: "Failed to assign tool. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleReturnTool() {
+    if (!selectedTool || !returnCondition) {
+      toast({
+        title: "Missing Information",
+        description: "Please select the tool condition.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("inventory_items")
+        .update({ 
+          assigned_to: null,
+          condition: returnCondition 
+        })
+        .eq("id", selectedTool.id);
+
+      if (error) throw error;
+
+      setTools(prev => prev.map(tool => 
+        tool.id === selectedTool.id 
+          ? { ...tool, assigned_to: undefined, condition: returnCondition } 
+          : tool
+      ));
+
+      toast({
+        title: "Tool Returned",
+        description: `${selectedTool.name} has been marked as returned.`,
+      });
+
+      setReturnDialogOpen(false);
+      setSelectedTool(null);
+      setReturnCondition("");
+    } catch (error) {
+      console.error("Error returning tool:", error);
+      toast({
+        title: "Return Failed",
+        description: "Failed to mark tool as returned. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function openAssignDialog(tool: InventoryItem) {
+    setSelectedTool(tool);
+    setAssignDialogOpen(true);
+  }
+
+  function openReturnDialog(tool: InventoryItem) {
+    setSelectedTool(tool);
+    setReturnCondition(tool.condition || "good");
+    setReturnDialogOpen(true);
   }
 
   const getStockStatus = (item: InventoryItem) => {
@@ -129,7 +262,6 @@ export default function InventoryPage() {
     item.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Analytics data
   const stockValueByCategory = materials.reduce((acc, item) => {
     const existing = acc.find(x => x.name === item.category);
     const value = item.current_quantity * item.unit_cost;
@@ -198,7 +330,6 @@ export default function InventoryPage() {
             </div>
           </div>
 
-          {/* Analytics Dashboard */}
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
@@ -240,7 +371,6 @@ export default function InventoryPage() {
             </Card>
           </div>
 
-          {/* Analytics Charts */}
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -419,11 +549,21 @@ export default function InventoryPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             {!tool.assigned_to ? (
-                              <Button variant="outline" size="sm" className="text-blue-600 border-blue-200 hover:bg-blue-50">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                                onClick={() => openAssignDialog(tool)}
+                              >
                                 <Hand className="w-4 h-4 mr-1" /> Assign Tool
                               </Button>
                             ) : (
-                              <Button variant="outline" size="sm" className="text-green-600 border-green-200 hover:bg-green-50">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-green-600 border-green-200 hover:bg-green-50"
+                                onClick={() => openReturnDialog(tool)}
+                              >
                                 Mark Returned
                               </Button>
                             )}
@@ -437,6 +577,133 @@ export default function InventoryPage() {
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Assign Tool Dialog */}
+        <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Assign Tool</DialogTitle>
+              <DialogDescription>
+                Assign {selectedTool?.name} to a team member. They will be responsible for returning it.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="tool-name">Tool</Label>
+                <Input 
+                  id="tool-name" 
+                  value={selectedTool?.name || ""} 
+                  disabled 
+                  className="bg-muted"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="team-member">Assign To</Label>
+                <Select value={selectedTeamMember} onValueChange={setSelectedTeamMember}>
+                  <SelectTrigger id="team-member">
+                    <SelectValue placeholder="Select team member..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teamMembers.map((member) => (
+                      <SelectItem key={member.id} value={member.full_name}>
+                        {member.full_name} ({member.role})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAssignTool} className="bg-blue-600 hover:bg-blue-700">
+                <Hand className="w-4 h-4 mr-2" />
+                Assign Tool
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Return Tool Dialog */}
+        <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Mark Tool as Returned</DialogTitle>
+              <DialogDescription>
+                Confirm {selectedTool?.name} has been returned and update its condition.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="return-tool-name">Tool</Label>
+                <Input 
+                  id="return-tool-name" 
+                  value={selectedTool?.name || ""} 
+                  disabled 
+                  className="bg-muted"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="return-assigned">Currently Assigned To</Label>
+                <Input 
+                  id="return-assigned" 
+                  value={selectedTool?.assigned_to || ""} 
+                  disabled 
+                  className="bg-muted"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="return-condition">Condition After Return</Label>
+                <Select value={returnCondition} onValueChange={setReturnCondition}>
+                  <SelectTrigger id="return-condition">
+                    <SelectValue placeholder="Select condition..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="excellent">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        Excellent
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="good">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        Good
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="fair">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                        Fair
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="poor">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-orange-500" />
+                        Poor
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="needs_repair">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-red-500" />
+                        Needs Repair
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReturnDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleReturnTool} className="bg-green-600 hover:bg-green-700">
+                Confirm Return
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </DashboardLayout>
     </PermissionGate>
   );
