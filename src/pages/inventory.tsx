@@ -107,7 +107,7 @@ export default function InventoryPage() {
     try {
       const { error } = await supabase
         .from("inventory_items")
-        .update({ condition: newCondition })
+        .update({ condition: newCondition } as any)
         .eq("id", toolId);
 
       if (error) throw error;
@@ -143,7 +143,7 @@ export default function InventoryPage() {
     try {
       const { error } = await supabase
         .from("inventory_items")
-        .update({ assigned_to: selectedTeamMember })
+        .update({ assigned_to: selectedTeamMember } as any)
         .eq("id", selectedTool.id);
 
       if (error) throw error;
@@ -186,7 +186,7 @@ export default function InventoryPage() {
         .update({ 
           assigned_to: null,
           condition: returnCondition 
-        })
+        } as any)
         .eq("id", selectedTool.id);
 
       if (error) throw error;
