@@ -510,7 +510,7 @@ export default function Dashboard() {
                     loading="lazy"
                     allowFullScreen
                     referrerPolicy="no-referrer-when-downgrade"
-                    src="https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&center=51.4543,0.9781&zoom=10"
+                    src="https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&center=51.4543,-0.9781&zoom=10"
                   ></iframe>
                   <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg max-w-sm">
                     <h4 className="font-semibold text-sm mb-2">📍 Berkshire Area</h4>
