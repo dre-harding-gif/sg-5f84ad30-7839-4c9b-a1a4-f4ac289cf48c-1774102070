@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Plus, 
   Search, 
@@ -22,7 +23,8 @@ import {
   CheckCircle2,
   Copy,
   Eye,
-  EyeOff
+  EyeOff,
+  FileText
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,7 +58,8 @@ export default function JobsPage() {
     start_date: "",
     end_date: "",
     description: "",
-    priority: "normal"
+    priority: "normal",
+    generate_po: false
   });
   const [portalDialogOpen, setPortalDialogOpen] = useState(false);
   const [portalCredentials, setPortalCredentials] = useState({ email: "", password: "", portalUrl: "" });
@@ -68,42 +71,30 @@ export default function JobsPage() {
 
   async function fetchJobs() {
     try {
-      const mockJobs: Job[] = [
-        {
-          id: "1",
-          job_number: "JOB-2024-001",
-          title: "Kitchen Extension",
-          status: "in_progress",
-          priority: "high",
-          address: "45 Oak Avenue, Manchester",
-          start_date: "2026-03-01",
-          end_date: "2026-04-15",
-          customer_name: "Sarah Mitchell"
-        },
-        {
-          id: "2",
-          job_number: "JOB-2024-002",
-          title: "Loft Conversion",
-          status: "scheduled",
-          priority: "normal",
-          address: "12 High Street, Liverpool",
-          start_date: "2026-04-20",
-          end_date: "2026-06-10",
-          customer_name: "John Davis"
-        },
-        {
-          id: "3",
-          job_number: "JOB-2024-003",
-          title: "Bathroom Refit",
-          status: "completed",
-          priority: "normal",
-          address: "88 Park Lane, Leeds",
-          start_date: "2026-02-10",
-          end_date: "2026-02-28",
-          customer_name: "Emma Thompson"
-        }
-      ];
-      setJobs(mockJobs);
+      const { data, error } = await supabase
+        .from("jobs")
+        .select(`
+          *,
+          customers:customer_id (name)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const formattedJobs = (data || []).map(j => ({
+        id: j.id,
+        job_number: j.job_number || "JOB-PENDING",
+        title: j.title,
+        status: j.status,
+        priority: j.priority || "normal",
+        address: j.address,
+        start_date: j.start_date,
+        end_date: j.end_date,
+        customer_name: j.customers?.name || j.customer_name || "Unknown",
+        customer_id: j.customer_id
+      }));
+
+      setJobs(formattedJobs);
     } catch (error) {
       console.error("Error fetching jobs:", error);
     } finally {
@@ -114,22 +105,89 @@ export default function JobsPage() {
   async function handleCreateJob(e: React.FormEvent) {
     e.preventDefault();
     
-    toast({
-      title: "Job Created Successfully!",
-      description: `${formData.title} has been added to your jobs.`,
-    });
+    try {
+      const { data: jobData, error: jobError } = await supabase
+        .from("jobs")
+        .insert([{
+          title: formData.title,
+          address: formData.address,
+          postcode: formData.postcode,
+          start_date: formData.start_date,
+          end_date: formData.end_date || null,
+          description: formData.description,
+          priority: formData.priority,
+          status: 'scheduled',
+          customer_name: formData.customer_name
+        }])
+        .select()
+        .single();
+        
+      if (jobError) throw jobError;
 
-    setDialogOpen(false);
-    setFormData({
-      title: "",
-      customer_name: "",
-      address: "",
-      postcode: "",
-      start_date: "",
-      end_date: "",
-      description: "",
-      priority: "normal"
-    });
+      let poMsg = "";
+      if (formData.generate_po) {
+        const { data: poNumber } = await supabase.rpc("generate_po_number");
+        if (poNumber) {
+          await supabase.from("purchase_orders").insert({
+            po_number: poNumber,
+            job_id: jobData.id,
+            supplier: "TBD",
+            total_amount: 0,
+            status: "pending"
+          });
+          poMsg = ` and P/O ${poNumber} generated.`;
+        }
+      }
+
+      toast({
+        title: "Job Created Successfully!",
+        description: `${formData.title} has been added${poMsg}`,
+      });
+
+      setDialogOpen(false);
+      setFormData({
+        title: "",
+        customer_name: "",
+        address: "",
+        postcode: "",
+        start_date: "",
+        end_date: "",
+        description: "",
+        priority: "normal",
+        generate_po: false
+      });
+      fetchJobs();
+    } catch (error: any) {
+      toast({
+        title: "Error Creating Job",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleGeneratePO(jobId: string, jobTitle: string) {
+    try {
+      const { data: poNumber, error } = await supabase.rpc("generate_po_number");
+      if (error) throw error;
+      
+      const { error: insertError } = await supabase.from("purchase_orders").insert({
+        po_number: poNumber,
+        job_id: jobId,
+        supplier: "TBD (Update in POs page)",
+        total_amount: 0,
+        status: "pending"
+      });
+      
+      if (insertError) throw insertError;
+      
+      toast({
+        title: "P/O Generated",
+        description: `P/O Number ${poNumber} created for ${jobTitle}. View it in the Purchase Orders page.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
   }
 
   async function handleStatusChange(jobId: string, newStatus: string) {
@@ -363,6 +421,18 @@ You can now:
                         rows={4}
                       />
                     </div>
+                    <div className="md:col-span-2 pt-2 border-t mt-2">
+                      <div className="flex items-center space-x-2 bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                        <Checkbox 
+                          id="generate_po" 
+                          checked={formData.generate_po}
+                          onCheckedChange={(checked) => setFormData({...formData, generate_po: checked as boolean})}
+                        />
+                        <Label htmlFor="generate_po" className="text-sm font-medium cursor-pointer">
+                          Automatically generate a P/O Number for this job
+                        </Label>
+                      </div>
+                    </div>
                   </div>
                   <div className="flex gap-2 justify-end pt-4">
                     <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
@@ -443,13 +513,18 @@ You can now:
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-3 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 mt-2 md:mt-0">
-                      <Link href={`/jobs/${job.id}`} className="w-full md:w-auto">
-                        <Button className="w-full md:w-auto">Manage Job</Button>
-                      </Link>
-                      <Button variant="ghost" size="icon" className="shrink-0 text-slate-400">
-                        <MoreVertical className="w-5 h-5" />
+                    <div className="flex items-center gap-3 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 mt-2 md:mt-0 flex-wrap">
+                      <Button 
+                        variant="outline" 
+                        className="w-full md:w-auto text-blue-600 border-blue-200 hover:bg-blue-50"
+                        onClick={() => handleGeneratePO(job.id, job.title)}
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Generate P/O
                       </Button>
+                      <Link href={`/jobs/${job.id}`} className="w-full md:w-auto flex-1">
+                        <Button className="w-full">Manage Job</Button>
+                      </Link>
                     </div>
                   </div>
                 </CardContent>

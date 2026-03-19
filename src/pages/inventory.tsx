@@ -25,12 +25,6 @@ import { Label } from "@/components/ui/label";
 
 const COLORS = ['#1e3a8a', '#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe'];
 
-// Type helper to avoid TS2589 deep instantiation error
-type InventoryUpdate = {
-  condition?: string;
-  assigned_to?: string | null;
-};
-
 interface InventoryItem {
   id: string;
   item_type: string;
@@ -74,7 +68,7 @@ export default function InventoryPage() {
 
   async function fetchInventory() {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("inventory_items")
         .select("*")
         .order("name");
@@ -95,7 +89,7 @@ export default function InventoryPage() {
 
   async function fetchTeamMembers() {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("profiles")
         .select("id, full_name, email, role")
         .in("role", ["builder", "site_manager", "subcontractor"])
@@ -111,10 +105,9 @@ export default function InventoryPage() {
 
   async function handleConditionChange(toolId: string, newCondition: string) {
     try {
-      const updateData: InventoryUpdate = { condition: newCondition };
       const { error } = await (supabase as any)
         .from("inventory_items")
-        .update(updateData)
+        .update({ condition: newCondition })
         .eq("id", toolId);
 
       if (error) throw error;
@@ -148,10 +141,9 @@ export default function InventoryPage() {
     }
 
     try {
-      const updateData: InventoryUpdate = { assigned_to: selectedTeamMember };
       const { error } = await (supabase as any)
         .from("inventory_items")
-        .update(updateData)
+        .update({ assigned_to: selectedTeamMember })
         .eq("id", selectedTool.id);
 
       if (error) throw error;
@@ -189,13 +181,9 @@ export default function InventoryPage() {
     }
 
     try {
-      const updateData: InventoryUpdate = { 
-        assigned_to: null,
-        condition: returnCondition 
-      };
       const { error } = await (supabase as any)
         .from("inventory_items")
-        .update(updateData)
+        .update({ assigned_to: null, condition: returnCondition })
         .eq("id", selectedTool.id);
 
       if (error) throw error;
