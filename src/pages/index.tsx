@@ -204,6 +204,20 @@ export default function Dashboard() {
     }
 
     try {
+      // Check if user is authenticated first
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error("Authentication error:", sessionError);
+        toast({
+          title: "Authentication Required",
+          description: "You must be logged in to create tasks. Please refresh the page and log in.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log("User authenticated:", session.user.id);
       console.log("Creating task:", newTask);
       
       const { data, error } = await supabase
@@ -222,16 +236,16 @@ export default function Dashboard() {
       if (error) {
         console.error("Task creation error:", error);
         toast({
-          title: "Error",
-          description: error.message || "Failed to create task",
+          title: "Error Creating Task",
+          description: error.message || "Failed to create task. Please try again.",
           variant: "destructive"
         });
         return;
       }
 
       toast({
-        title: "Task Created",
-        description: "Daily task has been added"
+        title: "✅ Task Created",
+        description: "Daily task has been added successfully"
       });
 
       setTaskDialogOpen(false);
@@ -245,8 +259,8 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Unexpected error creating task:", error);
       toast({
-        title: "Error",
-        description: "An unexpected error occurred",
+        title: "Unexpected Error",
+        description: "An unexpected error occurred. Please check the console.",
         variant: "destructive"
       });
     }
