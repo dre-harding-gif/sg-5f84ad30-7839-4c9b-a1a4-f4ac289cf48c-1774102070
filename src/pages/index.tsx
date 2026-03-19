@@ -203,38 +203,53 @@ export default function Dashboard() {
       return;
     }
 
-    const { error } = await supabase
-      .from("daily_tasks")
-      .insert([{
-        title: newTask.title,
-        description: newTask.description,
-        priority: newTask.priority,
-        status: "pending",
-        due_date: newTask.due_date
-      }]);
+    try {
+      console.log("Creating task:", newTask);
+      
+      const { data, error } = await supabase
+        .from("daily_tasks")
+        .insert([{
+          title: newTask.title,
+          description: newTask.description,
+          priority: newTask.priority,
+          status: "pending",
+          due_date: newTask.due_date
+        }])
+        .select();
 
-    if (error) {
+      console.log("Task creation result:", { data, error });
+
+      if (error) {
+        console.error("Task creation error:", error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to create task",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Task Created",
+        description: "Daily task has been added"
+      });
+
+      setTaskDialogOpen(false);
+      setNewTask({
+        title: "",
+        description: "",
+        priority: "medium",
+        due_date: new Date().toISOString().split('T')[0]
+      });
+      loadDashboardData();
+    } catch (error) {
+      console.error("Unexpected error creating task:", error);
       toast({
         title: "Error",
-        description: "Failed to create task",
+        description: "An unexpected error occurred",
         variant: "destructive"
       });
-      return;
     }
-
-    toast({
-      title: "Task Created",
-      description: "Daily task has been added"
-    });
-
-    setTaskDialogOpen(false);
-    setNewTask({
-      title: "",
-      description: "",
-      priority: "medium",
-      due_date: new Date().toISOString().split('T')[0]
-    });
-    loadDashboardData();
   }
 
   async function toggleTaskComplete(taskId: string, currentStatus: string) {
