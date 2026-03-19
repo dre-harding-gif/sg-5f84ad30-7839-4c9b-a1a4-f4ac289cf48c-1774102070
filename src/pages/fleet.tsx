@@ -20,7 +20,7 @@ interface Vehicle {
   registration: string;
   make: string;
   model: string;
-  status: string;
+  status?: string;
   assigned_to?: string;
   mot_due?: string;
   service_due?: string;
@@ -113,9 +113,9 @@ export default function FleetManagementPage() {
     try {
       setLoading(true);
 
-      // Load vehicles
+      // Load vehicles from company_fleet table
       const { data: vehiclesData } = await supabase
-        .from("vehicles")
+        .from("company_fleet")
         .select("*")
         .order("registration", { ascending: true });
 
@@ -124,7 +124,7 @@ export default function FleetManagementPage() {
         .from("fleet_issues")
         .select(`
           *,
-          vehicles!fleet_issues_vehicle_id_fkey(registration),
+          company_fleet!fleet_issues_vehicle_id_fkey(registration),
           profiles!fleet_issues_reported_by_fkey(full_name)
         `)
         .order("reported_date", { ascending: false });
@@ -134,7 +134,7 @@ export default function FleetManagementPage() {
         .from("fleet_service_bookings")
         .select(`
           *,
-          vehicles!fleet_service_bookings_vehicle_id_fkey(registration),
+          company_fleet!fleet_service_bookings_vehicle_id_fkey(registration),
           profiles!fleet_service_bookings_booked_by_fkey(full_name)
         `)
         .order("start_date", { ascending: false });
@@ -144,7 +144,7 @@ export default function FleetManagementPage() {
       setFleetIssues((issuesData || []).map((issue: any) => ({
         id: issue.id,
         vehicle_id: issue.vehicle_id,
-        vehicle_registration: issue.vehicles?.registration || 'Unknown',
+        vehicle_registration: issue.company_fleet?.registration || 'Unknown',
         issue_type: issue.issue_type,
         description: issue.description,
         reported_by: issue.reported_by,
@@ -158,7 +158,7 @@ export default function FleetManagementPage() {
       setServiceBookings((bookingsData || []).map((booking: any) => ({
         id: booking.id,
         vehicle_id: booking.vehicle_id,
-        vehicle_registration: booking.vehicles?.registration || 'Unknown',
+        vehicle_registration: booking.company_fleet?.registration || 'Unknown',
         booking_type: booking.booking_type,
         start_date: booking.start_date,
         end_date: booking.end_date,
@@ -193,14 +193,14 @@ export default function FleetManagementPage() {
     try {
       const { error } = await supabase
         .from("fleet_issues")
-        .insert([{
+        .insert({
           vehicle_id: newIssue.vehicle_id,
           issue_type: newIssue.issue_type,
           description: newIssue.description,
           priority: newIssue.priority,
           reported_by: userId,
           status: "open"
-        }]);
+        });
 
       if (error) throw error;
 
@@ -240,7 +240,7 @@ export default function FleetManagementPage() {
     try {
       const { error } = await supabase
         .from("fleet_service_bookings")
-        .insert([{
+        .insert({
           vehicle_id: newBooking.vehicle_id,
           booking_type: newBooking.booking_type,
           start_date: newBooking.start_date,
@@ -248,7 +248,7 @@ export default function FleetManagementPage() {
           notes: newBooking.notes,
           booked_by: userId,
           status: "scheduled"
-        }]);
+        });
 
       if (error) throw error;
 
@@ -339,16 +339,17 @@ export default function FleetManagementPage() {
     }
   }
 
-  const getVehicleStatusBadge = (status: string) => {
+  const getVehicleStatusBadge = (status?: string) => {
     const colors: { [key: string]: string } = {
       available: "bg-green-100 text-green-800",
       in_use: "bg-blue-100 text-blue-800",
       maintenance: "bg-orange-100 text-orange-800",
       out_of_service: "bg-red-100 text-red-800"
     };
+    const displayStatus = status || 'available';
     return (
-      <Badge className={colors[status] || "bg-gray-100 text-gray-800"}>
-        {status.replace('_', ' ')}
+      <Badge className={colors[displayStatus] || "bg-gray-100 text-gray-800"}>
+        {displayStatus.replace('_', ' ')}
       </Badge>
     );
   };
@@ -394,7 +395,7 @@ export default function FleetManagementPage() {
     );
   };
 
-  const canManageFleet = ["manager", "office", "admin"].includes(userRole);
+  const canManageFleet = ["owner", "office_manager"].includes(userRole);
 
   if (loading) {
     return (
