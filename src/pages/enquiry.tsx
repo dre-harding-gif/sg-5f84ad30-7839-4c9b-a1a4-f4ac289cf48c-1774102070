@@ -212,6 +212,8 @@ export default function EnquiryForm() {
                   <option value="groundworks">Groundworks</option>
                   <option value="electrical">Electrical</option>
                   <option value="plumbing">Plumbing</option>
+                  <option value="damp_proofing">Damp Proofing & Waterproofing</option>
+                  <option value="timber_rot">Timber Rot Treatment</option>
                   <option value="other">Other</option>
                 </select>
               </div>

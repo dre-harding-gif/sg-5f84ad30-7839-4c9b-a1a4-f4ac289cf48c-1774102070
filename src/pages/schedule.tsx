@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { SEO } from "@/components/SEO";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,28 +8,109 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, ChevronLeft, ChevronRight, Plus, Users } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Plus, Users, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import { PermissionGate } from "@/components/PermissionGate";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-const mockSchedule = [
-  { id: "1", title: "Kitchen Extension", customer: "Sarah Mitchell", date: "2026-03-17", team: "Mike, Tom", status: "in_progress" },
-  { id: "2", title: "Bathroom Refit", customer: "John Davis", date: "2026-03-18", team: "Steve", status: "scheduled" },
-  { id: "3", title: "Loft Conversion", customer: "Emma Wilson", date: "2026-03-19", team: "Mike, Pete", status: "scheduled" },
-  { id: "4", title: "Garden Wall", customer: "David Brown", date: "2026-03-20", team: "Tom", status: "scheduled" },
-];
+interface ScheduleJob {
+  id: string;
+  title: string;
+  customer_name: string;
+  date: string;
+  team: string;
+  status: string;
+}
 
 export default function SchedulePage() {
   const { toast } = useToast();
-  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<"week" | "month">("month");
+  const [userRole, setUserRole] = useState<string>("");
+  const [scheduleJobs, setScheduleJobs] = useState<ScheduleJob[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadUserRole();
+    loadScheduleJobs();
+  }, [currentDate, viewMode]);
+
+  async function loadUserRole() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profile) {
+        setUserRole(profile.role);
+        // Builders see week view by default, managers see month
+        if (profile.role === "builder") {
+          setViewMode("week");
+        } else {
+          setViewMode("month");
+        }
+      }
+    } catch (error) {
+      console.error("Error loading user role:", error);
+    }
+  }
+
+  async function loadScheduleJobs() {
+    try {
+      setLoading(true);
+      let startDate: Date;
+      let endDate: Date;
+
+      if (viewMode === "week") {
+        const weekDates = getWeekDates();
+        startDate = weekDates[0];
+        endDate = weekDates[6];
+      } else {
+        const monthDates = getMonthDates();
+        startDate = monthDates[0];
+        endDate = monthDates[monthDates.length - 1];
+      }
+
+      const { data: jobsData } = await supabase
+        .from("jobs")
+        .select(`
+          *,
+          profiles!jobs_customer_id_fkey(full_name)
+        `)
+        .gte("start_date", startDate.toISOString().split('T')[0])
+        .lte("start_date", endDate.toISOString().split('T')[0])
+        .order("start_date", { ascending: true });
+
+      const formattedJobs = (jobsData || []).map((job: any) => ({
+        id: job.id,
+        title: job.title,
+        customer_name: job.profiles?.full_name || 'Unknown Customer',
+        date: job.start_date,
+        team: Array.isArray(job.assigned_team) ? job.assigned_team.join(", ") : "Unassigned",
+        status: job.status
+      }));
+
+      setScheduleJobs(formattedJobs);
+    } catch (error) {
+      console.error("Error loading schedule:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const getWeekDates = () => {
     const dates = [];
-    const start = new Date(currentWeek);
+    const start = new Date(currentDate);
     start.setDate(start.getDate() - start.getDay() + 1);
     
     for (let i = 0; i < 7; i++) {
@@ -40,23 +121,55 @@ export default function SchedulePage() {
     return dates;
   };
 
-  const weekDates = getWeekDates();
+  const getMonthDates = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    const dates = [];
+    const startPadding = (firstDay.getDay() + 6) % 7;
+    
+    for (let i = startPadding - 1; i >= 0; i--) {
+      const date = new Date(year, month, -i);
+      dates.push(date);
+    }
+    
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      dates.push(new Date(year, month, i));
+    }
+    
+    const endPadding = (7 - (dates.length % 7)) % 7;
+    for (let i = 1; i <= endPadding; i++) {
+      dates.push(new Date(year, month + 1, i));
+    }
+    
+    return dates;
+  };
 
   const getJobsForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
-    return mockSchedule.filter(job => job.date === dateStr);
+    return scheduleJobs.filter(job => job.date === dateStr);
   };
 
-  const previousWeek = () => {
-    const newDate = new Date(currentWeek);
-    newDate.setDate(newDate.getDate() - 7);
-    setCurrentWeek(newDate);
+  const previousPeriod = () => {
+    const newDate = new Date(currentDate);
+    if (viewMode === "week") {
+      newDate.setDate(newDate.getDate() - 7);
+    } else {
+      newDate.setMonth(newDate.getMonth() - 1);
+    }
+    setCurrentDate(newDate);
   };
 
-  const nextWeek = () => {
-    const newDate = new Date(currentWeek);
-    newDate.setDate(newDate.getDate() + 7);
-    setCurrentWeek(newDate);
+  const nextPeriod = () => {
+    const newDate = new Date(currentDate);
+    if (viewMode === "week") {
+      newDate.setDate(newDate.getDate() + 7);
+    } else {
+      newDate.setMonth(newDate.getMonth() + 1);
+    }
+    setCurrentDate(newDate);
   };
 
   const handleScheduleJob = () => {
@@ -65,6 +178,31 @@ export default function SchedulePage() {
       description: "Job has been added to the schedule",
     });
     setDialogOpen(false);
+    loadScheduleJobs();
+  };
+
+  const getJobStatusColor = (status: string) => {
+    const colors: { [key: string]: string } = {
+      pending: "bg-gray-100 text-gray-800",
+      scheduled: "bg-blue-100 text-blue-800",
+      in_progress: "bg-orange-100 text-orange-800",
+      completed: "bg-green-100 text-green-800"
+    };
+    return colors[status] || "bg-gray-100 text-gray-800";
+  };
+
+  const weekDates = viewMode === "week" ? getWeekDates() : [];
+  const monthDates = viewMode === "month" ? getMonthDates() : [];
+  const currentMonth = monthNames[currentDate.getMonth()];
+  const currentYear = currentDate.getFullYear();
+
+  const isCurrentMonth = (date: Date) => {
+    return date.getMonth() === currentDate.getMonth();
+  };
+
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
   };
 
   return (
@@ -79,129 +217,238 @@ export default function SchedulePage() {
               <h1 className="text-3xl font-heading font-bold text-foreground">Work Schedule</h1>
               <p className="text-muted-foreground mt-1">Plan and manage team assignments</p>
             </div>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-orange-500 hover:bg-orange-600 text-white">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Schedule Job
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Quick Schedule Job</DialogTitle>
-                  <DialogDescription>
-                    Assign a job to team members for a specific date
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="job">Select Job</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a job" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Kitchen Extension - Sarah Mitchell</SelectItem>
-                        <SelectItem value="2">Bathroom Refit - John Davis</SelectItem>
-                        <SelectItem value="3">Loft Conversion - Emma Wilson</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="date">Schedule Date</Label>
-                    <Input type="date" id="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="team">Assign Team Members</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select team members" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="mike">Mike (Builder)</SelectItem>
-                        <SelectItem value="tom">Tom (Builder)</SelectItem>
-                        <SelectItem value="steve">Steve (Site Manager)</SelectItem>
-                        <SelectItem value="pete">Pete (Builder)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex gap-2 justify-end pt-4">
-                    <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={handleScheduleJob} className="bg-orange-500 hover:bg-orange-600 text-white">
-                      Schedule
-                    </Button>
-                  </div>
+            <div className="flex gap-2">
+              {/* View Mode Toggle (Only for managers/office) */}
+              {userRole !== "builder" && (
+                <div className="flex gap-1 bg-muted rounded-lg p-1">
+                  <Button
+                    variant={viewMode === "week" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("week")}
+                    className={viewMode === "week" ? "bg-orange-500 hover:bg-orange-600" : ""}
+                  >
+                    <CalendarDays className="h-4 w-4 mr-1" />
+                    Week
+                  </Button>
+                  <Button
+                    variant={viewMode === "month" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("month")}
+                    className={viewMode === "month" ? "bg-orange-500 hover:bg-orange-600" : ""}
+                  >
+                    <Calendar className="h-4 w-4 mr-1" />
+                    Month
+                  </Button>
                 </div>
-              </DialogContent>
-            </Dialog>
+              )}
+              
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Schedule Job
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Quick Schedule Job</DialogTitle>
+                    <DialogDescription>
+                      Assign a job to team members for a specific date
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="job">Select Job</Label>
+                      <Select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a job" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Kitchen Extension - Sarah Mitchell</SelectItem>
+                          <SelectItem value="2">Bathroom Refit - John Davis</SelectItem>
+                          <SelectItem value="3">Loft Conversion - Emma Wilson</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="date">Schedule Date</Label>
+                      <Input type="date" id="date" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="team">Assign Team Members</Label>
+                      <Select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select team members" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="mike">Mike (Builder)</SelectItem>
+                          <SelectItem value="tom">Tom (Builder)</SelectItem>
+                          <SelectItem value="steve">Steve (Site Manager)</SelectItem>
+                          <SelectItem value="pete">Pete (Builder)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-4">
+                      <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                      <Button onClick={handleScheduleJob} className="bg-orange-500 hover:bg-orange-600 text-white">
+                        Schedule
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
 
-          {/* Week Navigator */}
+          {/* Period Navigator */}
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
-                <Button variant="outline" size="icon" onClick={previousWeek}>
+                <Button variant="outline" size="icon" onClick={previousPeriod}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div className="text-center">
-                  <h2 className="text-xl font-bold">
-                    {weekDates[0].toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} - {weekDates[6].toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                  </h2>
-                  <p className="text-sm text-muted-foreground mt-1">Week {Math.ceil((weekDates[0].getDate()) / 7)}</p>
+                  {viewMode === "week" ? (
+                    <>
+                      <h2 className="text-xl font-bold">
+                        {weekDates[0].toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} - {weekDates[6].toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </h2>
+                      <p className="text-sm text-muted-foreground mt-1">Week View</p>
+                    </>
+                  ) : (
+                    <>
+                      <h2 className="text-xl font-bold">
+                        {currentMonth} {currentYear}
+                      </h2>
+                      <p className="text-sm text-muted-foreground mt-1">Month View</p>
+                    </>
+                  )}
                 </div>
-                <Button variant="outline" size="icon" onClick={nextWeek}>
+                <Button variant="outline" size="icon" onClick={nextPeriod}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Calendar Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-            {weekDates.map((date, index) => {
-              const jobs = getJobsForDate(date);
-              const isToday = date.toDateString() === new Date().toDateString();
-              
-              return (
-                <Card key={index} className={isToday ? "border-2 border-orange-500" : ""}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm flex items-center justify-between">
-                      <span className="text-muted-foreground">{daysOfWeek[index]}</span>
-                      <span className={`text-lg font-bold ${isToday ? 'text-orange-500' : ''}`}>
-                        {date.getDate()}
-                      </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {jobs.length > 0 ? (
-                      jobs.map(job => (
-                        <Link key={job.id} href={`/jobs/${job.id}`}>
-                          <div className="p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors cursor-pointer">
-                            <h4 className="font-semibold text-sm mb-1">{job.title}</h4>
-                            <p className="text-xs text-muted-foreground mb-2">{job.customer}</p>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">
-                                {job.team}
-                              </Badge>
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-muted-foreground">Loading schedule...</p>
+            </div>
+          ) : (
+            <>
+              {/* Week View */}
+              {viewMode === "week" && (
+                <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+                  {weekDates.map((date, index) => {
+                    const jobs = getJobsForDate(date);
+                    const today = isToday(date);
+                    
+                    return (
+                      <Card key={index} className={today ? "border-2 border-orange-500" : ""}>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm flex items-center justify-between">
+                            <span className="text-muted-foreground">{daysOfWeek[index]}</span>
+                            <span className={`text-lg font-bold ${today ? 'text-orange-500' : ''}`}>
+                              {date.getDate()}
+                            </span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {jobs.length > 0 ? (
+                            jobs.map(job => (
+                              <Link key={job.id} href={`/jobs/${job.id}`}>
+                                <div className="p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors cursor-pointer">
+                                  <h4 className="font-semibold text-sm mb-1">{job.title}</h4>
+                                  <p className="text-xs text-muted-foreground mb-2">{job.customer_name}</p>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className={getJobStatusColor(job.status)}>
+                                      {job.status.replace('_', ' ')}
+                                    </Badge>
+                                  </div>
+                                  {job.team && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      <Users className="h-3 w-3 inline mr-1" />
+                                      {job.team}
+                                    </p>
+                                  )}
+                                </div>
+                              </Link>
+                            ))
+                          ) : (
+                            <p className="text-xs text-muted-foreground text-center py-4">No jobs scheduled</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Month View */}
+              {viewMode === "month" && (
+                <Card>
+                  <CardContent className="p-6">
+                    {/* Month Header */}
+                    <div className="grid grid-cols-7 gap-2 mb-4">
+                      {daysOfWeek.map((day) => (
+                        <div key={day} className="text-center font-semibold text-sm text-muted-foreground py-2">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Month Grid */}
+                    <div className="grid grid-cols-7 gap-2">
+                      {monthDates.map((date, index) => {
+                        const jobs = getJobsForDate(date);
+                        const today = isToday(date);
+                        const currentMonthDate = isCurrentMonth(date);
+                        
+                        return (
+                          <div
+                            key={index}
+                            className={`
+                              min-h-[120px] p-2 border rounded-lg
+                              ${today ? 'border-2 border-orange-500 bg-orange-50' : 'border-border'}
+                              ${!currentMonthDate ? 'bg-muted/50 text-muted-foreground' : 'bg-background'}
+                              hover:bg-accent transition-colors
+                            `}
+                          >
+                            <div className={`text-sm font-semibold mb-2 ${today ? 'text-orange-600' : ''}`}>
+                              {date.getDate()}
+                            </div>
+                            <div className="space-y-1">
+                              {jobs.slice(0, 3).map(job => (
+                                <Link key={job.id} href={`/jobs/${job.id}`}>
+                                  <div className="text-xs p-1.5 bg-blue-100 hover:bg-blue-200 rounded cursor-pointer truncate">
+                                    <div className="font-medium truncate">{job.title}</div>
+                                    <div className="text-muted-foreground truncate">{job.customer_name}</div>
+                                  </div>
+                                </Link>
+                              ))}
+                              {jobs.length > 3 && (
+                                <div className="text-xs text-muted-foreground text-center py-1">
+                                  +{jobs.length - 3} more
+                                </div>
+                              )}
                             </div>
                           </div>
-                        </Link>
-                      ))
-                    ) : (
-                      <p className="text-xs text-muted-foreground text-center py-4">No jobs scheduled</p>
-                    )}
+                        );
+                      })}
+                    </div>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
+              )}
+            </>
+          )}
 
           {/* Legend */}
           <Card>
             <CardHeader>
               <CardTitle>Schedule Legend</CardTitle>
             </CardHeader>
-            <CardContent className="flex gap-4">
+            <CardContent className="flex gap-4 flex-wrap">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-orange-100 border-2 border-orange-500"></div>
                 <span className="text-sm">Today</span>
@@ -213,6 +460,10 @@ export default function SchedulePage() {
               <div className="flex items-center gap-2">
                 <Badge className="bg-blue-100 text-blue-800">Scheduled</Badge>
                 <span className="text-sm">Upcoming job</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-green-100 text-green-800">Completed</Badge>
+                <span className="text-sm">Finished job</span>
               </div>
             </CardContent>
           </Card>

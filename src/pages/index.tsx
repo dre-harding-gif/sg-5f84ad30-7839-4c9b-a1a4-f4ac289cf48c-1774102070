@@ -227,7 +227,8 @@ export default function Dashboard() {
           description: newTask.description,
           priority: newTask.priority,
           status: "pending",
-          due_date: newTask.due_date
+          due_date: newTask.due_date,
+          created_by: session.user.id
         }])
         .select();
 
