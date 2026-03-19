@@ -25,6 +25,12 @@ import { Label } from "@/components/ui/label";
 
 const COLORS = ['#1e3a8a', '#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe'];
 
+// Type helper to avoid TS2589 deep instantiation error
+type InventoryUpdate = {
+  condition?: string;
+  assigned_to?: string | null;
+};
+
 interface InventoryItem {
   id: string;
   item_type: string;
@@ -105,9 +111,10 @@ export default function InventoryPage() {
 
   async function handleConditionChange(toolId: string, newCondition: string) {
     try {
-      const { error } = await supabase
+      const updateData: InventoryUpdate = { condition: newCondition };
+      const { error } = await (supabase
         .from("inventory_items")
-        .update({ condition: newCondition } as any)
+        .update(updateData) as any)
         .eq("id", toolId);
 
       if (error) throw error;
@@ -141,9 +148,10 @@ export default function InventoryPage() {
     }
 
     try {
-      const { error } = await supabase
+      const updateData: InventoryUpdate = { assigned_to: selectedTeamMember };
+      const { error } = await (supabase
         .from("inventory_items")
-        .update({ assigned_to: selectedTeamMember } as any)
+        .update(updateData) as any)
         .eq("id", selectedTool.id);
 
       if (error) throw error;
@@ -181,12 +189,13 @@ export default function InventoryPage() {
     }
 
     try {
-      const { error } = await supabase
+      const updateData: InventoryUpdate = { 
+        assigned_to: null,
+        condition: returnCondition 
+      };
+      const { error } = await (supabase
         .from("inventory_items")
-        .update({ 
-          assigned_to: null,
-          condition: returnCondition 
-        } as any)
+        .update(updateData) as any)
         .eq("id", selectedTool.id);
 
       if (error) throw error;
