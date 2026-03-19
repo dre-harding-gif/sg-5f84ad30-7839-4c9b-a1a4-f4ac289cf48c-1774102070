@@ -75,7 +75,7 @@ export default function JobsPage() {
         .from("jobs")
         .select(`
           *,
-          customers:customer_id (name)
+          customer:profiles!jobs_customer_id_fkey(full_name)
         `)
         .order("created_at", { ascending: false });
 
@@ -90,7 +90,7 @@ export default function JobsPage() {
         address: j.address,
         start_date: j.start_date,
         end_date: j.end_date,
-        customer_name: j.customers?.name || j.customer_name || "Unknown",
+        customer_name: (j.customer as any)?.full_name || "Unknown",
         customer_id: j.customer_id
       }));
 
@@ -106,9 +106,30 @@ export default function JobsPage() {
     e.preventDefault();
     
     try {
+      // 1. Get or create customer profile
+      let customerId = "";
+      
+      const { data: customerData, error: customerError } = await supabase
+        .from("profiles")
+        .insert([{
+          full_name: formData.customer_name,
+          role: "customer"
+        }])
+        .select("id")
+        .single();
+        
+      if (customerError) throw customerError;
+      customerId = customerData.id;
+
+      // 2. Generate Job Number
+      const jobNumber = `JOB-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      // 3. Create Job
       const { data: jobData, error: jobError } = await supabase
         .from("jobs")
         .insert([{
+          job_number: jobNumber,
+          customer_id: customerId,
           title: formData.title,
           address: formData.address,
           postcode: formData.postcode,
@@ -116,8 +137,7 @@ export default function JobsPage() {
           end_date: formData.end_date || null,
           description: formData.description,
           priority: formData.priority,
-          status: 'scheduled',
-          customer_name: formData.customer_name
+          status: 'scheduled'
         }])
         .select()
         .single();
