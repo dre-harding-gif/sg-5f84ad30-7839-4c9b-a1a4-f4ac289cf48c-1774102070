@@ -61,16 +61,18 @@ export default function Profile() {
         .single();
 
       if (error) throw error;
+      
+      const p = profile as any;
 
       setProfileData({
-        id: profile.id,
+        id: p.id,
         email: session.user.email || "",
-        full_name: profile.full_name || "",
-        role: profile.role || "staff",
-        phone: profile.phone,
-        address: profile.address,
-        avatar_url: profile.avatar_url,
-        bio: profile.bio
+        full_name: p.full_name || "",
+        role: p.role || "staff",
+        phone: p.phone,
+        address: p.address,
+        avatar_url: p.avatar_url,
+        bio: p.bio
       });
 
     } catch (error: any) {

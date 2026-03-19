@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Plus, Mail, Phone, CheckCircle2, Clock, Eye, EyeOff, Copy, RefreshCw, Send } from "lucide-react";
+import { Users, Plus, Mail, Phone, CheckCircle2, Clock, Eye, EyeOff, Copy, RefreshCw, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getUserPermissions, updateUserRole } from "@/services/roleService";
 import type { UserRole } from "@/services/roleService";
@@ -17,6 +17,7 @@ import { authService } from "@/services/authService";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface TeamMember {
   id: string;
@@ -53,6 +54,11 @@ export default function TeamPage() {
 
   // Resend state
   const [resending, setResending] = useState<string | null>(null);
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchTeamMembers();
@@ -219,6 +225,39 @@ export default function TeamPage() {
       setResending(null);
     }
   };
+
+  async function handleDeleteMember() {
+    if (!memberToDelete) return;
+
+    setDeleting(true);
+    try {
+      // Delete from auth.users (this will cascade to profiles due to FK)
+      const { error: authError } = await supabase.auth.admin.deleteUser(memberToDelete.id);
+      
+      if (authError) {
+        throw authError;
+      }
+
+      toast({
+        title: "✅ Team Member Deleted",
+        description: `${memberToDelete.full_name} has been removed from the team`
+      });
+
+      setDeleteDialogOpen(false);
+      setMemberToDelete(null);
+      await fetchTeamMembers();
+
+    } catch (error: any) {
+      console.error("Error deleting team member:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete team member",
+        variant: "destructive"
+      });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   function copyCredentialsToClipboard() {
     const credentials = `Harding Homes Login Credentials
@@ -412,6 +451,18 @@ Login at: ${window.location.origin}
                                 <Send className="h-4 w-4 mr-1" />
                               )}
                               Resend Invite
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setMemberToDelete(member);
+                                setDeleteDialogOpen(true);
+                              }}
+                              className="text-red-600 border-red-500 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete
                             </Button>
                           </PermissionGate>
                         </div>
@@ -664,6 +715,29 @@ Login at: ${window.location.origin}
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Team Member?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete <strong>{memberToDelete?.full_name}</strong> from the team? 
+                This action cannot be undone and will permanently remove their account and all associated data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteMember}
+                disabled={deleting}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {deleting ? "Deleting..." : "Delete Member"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DashboardLayout>
     </PermissionGate>
   );
