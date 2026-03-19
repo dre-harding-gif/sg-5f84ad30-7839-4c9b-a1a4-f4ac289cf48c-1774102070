@@ -12,18 +12,38 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    console.log("Environment check:", {
+      hasUrl: !!supabaseUrl,
+      hasKey: !!supabaseServiceKey,
+      urlValue: supabaseUrl
+    });
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Missing environment variables",
+          details: {
+            hasUrl: !!supabaseUrl,
+            hasKey: !!supabaseServiceKey
+          }
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
 
     const { userId, newPassword } = await req.json();
+
+    console.log("Request data:", { userId, hasPassword: !!newPassword });
 
     if (!userId || !newPassword) {
       return new Response(
@@ -33,25 +53,44 @@ serve(async (req) => {
     }
 
     // Reset password using admin API
+    console.log("Attempting password reset for user:", userId);
+    
     const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
       userId,
       { password: newPassword }
     );
 
+    console.log("Admin API response:", { 
+      success: !!data, 
+      error: error?.message,
+      errorDetails: error
+    });
+
     if (error) {
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ 
+          error: error.message,
+          details: error
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     return new Response(
-      JSON.stringify({ success: true, user: data.user }),
+      JSON.stringify({ 
+        success: true, 
+        message: "Password reset successfully",
+        user: { id: data.user.id, email: data.user.email }
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    console.error("Function error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message || "Unknown error",
+        stack: error.stack
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
