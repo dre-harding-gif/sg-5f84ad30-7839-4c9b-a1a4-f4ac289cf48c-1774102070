@@ -1,413 +1,513 @@
 import { useState, useEffect } from "react";
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { useRouter } from "next/router";
 import { SEO } from "@/components/SEO";
+import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { User, Shield, Save, LogOut, Camera, Trash2, Download } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/router";
+import { Loader2, User, Mail, Phone, MapPin, Lock, Save, Upload } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export default function ProfilePage() {
-  const { toast } = useToast();
+interface ProfileData {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  phone?: string;
+  address?: string;
+  avatar_url?: string;
+  bio?: string;
+}
+
+export default function Profile() {
   const router = useRouter();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [changingPassword, setChangingPassword] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
   
-  const [profile, setProfile] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    avatar_url: "",
-  });
-  
-  const [passwordForm, setPasswordForm] = useState({
+  // Password change state
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
-    confirmPassword: "",
+    confirmPassword: ""
   });
+  const [passwordError, setPasswordError] = useState("");
 
   useEffect(() => {
-    loadUserProfile();
+    loadProfile();
   }, []);
 
-  async function loadUserProfile() {
+  async function loadProfile() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/portal/login");
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        router.push("/staff-login");
         return;
       }
 
-      const { data } = await supabase
+      const { data: profile, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
+        .eq("id", session.user.id)
         .single();
 
-      if (data) {
-        const profileData = data as any;
-        setProfile({
-          full_name: data.full_name || "",
-          email: user.email || "",
-          phone: profileData.phone || "",
-          avatar_url: profileData.avatar_url || "",
-        });
-      }
-    } catch (error) {
+      if (error) throw error;
+
+      setProfileData({
+        id: profile.id,
+        email: session.user.email || "",
+        full_name: profile.full_name || "",
+        role: profile.role || "staff",
+        phone: profile.phone,
+        address: profile.address,
+        avatar_url: profile.avatar_url,
+        bio: profile.bio
+      });
+
+    } catch (error: any) {
       console.error("Error loading profile:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load profile data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   }
 
   async function handleSaveProfile() {
+    if (!profileData) return;
+
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const updateData: any = {
-        full_name: profile.full_name,
-        phone: profile.phone,
-        avatar_url: profile.avatar_url,
-      };
-
       const { error } = await supabase
         .from("profiles")
-        .update(updateData)
-        .eq("id", user.id);
+        .update({
+          full_name: profileData.full_name,
+          phone: profileData.phone,
+          address: profileData.address,
+          bio: profileData.bio
+        })
+        .eq("id", profileData.id);
 
       if (error) throw error;
 
       toast({
-        title: "Profile updated",
-        description: "Your profile details have been saved successfully.",
+        title: "✅ Profile Updated",
+        description: "Your profile has been saved successfully"
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving profile:", error);
       toast({
         title: "Error",
-        description: "Failed to save profile. Please try again.",
-        variant: "destructive",
+        description: error.message || "Failed to save profile",
+        variant: "destructive"
       });
     } finally {
       setSaving(false);
     }
   }
 
-  async function handlePasswordChange() {
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast({
-        title: "Passwords don't match",
-        description: "New password and confirmation must match.",
-        variant: "destructive",
-      });
-      return;
-    }
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files || !e.target.files[0] || !profileData) return;
 
-    if (passwordForm.newPassword.length < 8) {
-      toast({
-        title: "Password too short",
-        description: "Password must be at least 8 characters long.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const file = e.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${profileData.id}-${Math.random()}.${fileExt}`;
 
-    setChangingPassword(true);
+    setUploadingAvatar(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: passwordForm.newPassword,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Password updated",
-        description: "Your password has been changed successfully.",
-      });
-
-      setPasswordForm({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
-    } catch (error: any) {
-      console.error("Error changing password:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to change password. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setChangingPassword(false);
-    }
-  }
-
-  async function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    try {
-      setUploading(true);
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
+      // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(filePath, file);
+        .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
+      // Get public URL
+      const { data } = supabase.storage
         .from("avatars")
-        .getPublicUrl(filePath);
+        .getPublicUrl(fileName);
 
-      setProfile({ ...profile, avatar_url: publicUrl });
-
+      // Update profile with new avatar URL
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({ avatar_url: publicUrl })
-        .eq("id", user.id);
+        .update({ avatar_url: data.publicUrl })
+        .eq("id", profileData.id);
 
       if (updateError) throw updateError;
 
+      setProfileData({ ...profileData, avatar_url: data.publicUrl });
+
       toast({
-        title: "Photo uploaded",
-        description: "Your profile photo has been updated.",
+        title: "✅ Avatar Updated",
+        description: "Your profile photo has been updated"
       });
     } catch (error: any) {
       console.error("Error uploading avatar:", error);
       toast({
-        title: "Upload failed",
-        description: error.message || "Failed to upload photo. Please try again.",
-        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to upload avatar",
+        variant: "destructive"
       });
     } finally {
-      setUploading(false);
+      setUploadingAvatar(false);
     }
   }
 
-  async function handleSignOutAllDevices() {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: "Signed out",
-        description: "You have been signed out from all devices.",
-      });
-      router.push("/portal/login");
-    } catch (error) {
-      console.error("Error signing out:", error);
-      toast({
-        title: "Error",
-        description: "Failed to sign out. Please try again.",
-        variant: "destructive",
-      });
+  async function handlePasswordChange() {
+    setPasswordError("");
+
+    // Validation
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      setPasswordError("All password fields are required");
+      return;
     }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setPasswordError("New password must be at least 6 characters");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Verify current password by attempting to sign in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: profileData!.email,
+        password: passwordData.currentPassword
+      });
+
+      if (signInError) {
+        setPasswordError("Current password is incorrect");
+        setSaving(false);
+        return;
+      }
+
+      // Update password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: passwordData.newPassword
+      });
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "✅ Password Changed",
+        description: "Your password has been updated successfully"
+      });
+
+      // Reset form
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      });
+      setShowPasswordChange(false);
+
+    } catch (error: any) {
+      console.error("Error changing password:", error);
+      setPasswordError(error.message || "Failed to change password");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map(n => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <SEO title="Profile - Harding Homes" />
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!profileData) {
+    return (
+      <DashboardLayout>
+        <SEO title="Profile - Harding Homes" />
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Failed to load profile</p>
+        </div>
+      </DashboardLayout>
+    );
   }
 
   return (
     <DashboardLayout>
-      <SEO title="My Profile - Harding Homes" />
+      <SEO title="Profile - Harding Homes" />
       
-      <div className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto space-y-6">
+      <div className="space-y-6 max-w-4xl">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">My Profile</h1>
-          <p className="text-muted-foreground mt-1">Manage your personal information and security</p>
+          <h1 className="text-3xl font-bold">My Profile</h1>
+          <p className="text-muted-foreground">Manage your account settings and personal information</p>
         </div>
 
-        <Tabs defaultValue="details" className="space-y-6">
-          <TabsList className="bg-white border">
-            <TabsTrigger value="details" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <User className="w-4 h-4 mr-2" />
-              Personal Details
-            </TabsTrigger>
-            <TabsTrigger value="security" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Shield className="w-4 h-4 mr-2" />
-              Security & Password
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="details">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>Update your personal details and contact information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Profile Photo */}
-                <div className="space-y-2">
-                  <Label>Profile Photo</Label>
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      {profile.avatar_url ? (
-                        <img
-                          src={profile.avatar_url}
-                          alt="Profile"
-                          className="w-24 h-24 rounded-full object-cover border-4 border-muted"
-                        />
-                      ) : (
-                        <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center border-4 border-background shadow-sm">
-                          <User className="w-10 h-10 text-muted-foreground" />
-                        </div>
-                      )}
-                      <label
-                        htmlFor="avatar-upload"
-                        className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-2 rounded-full cursor-pointer hover:bg-primary/90 transition-colors shadow-md"
-                      >
-                        <Camera className="w-4 h-4" />
-                      </label>
-                      <input
-                        id="avatar-upload"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleAvatarUpload}
-                        disabled={uploading}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Upload a new photo</p>
-                      <p className="text-xs text-muted-foreground">JPG, PNG or GIF. Max 2MB.</p>
-                      {uploading && <p className="text-xs text-primary mt-1">Uploading...</p>}
-                    </div>
+        {/* Profile Photo */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile Photo</CardTitle>
+            <CardDescription>Update your profile picture</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={profileData.avatar_url} alt={profileData.full_name} />
+                <AvatarFallback className="text-2xl">
+                  {getInitials(profileData.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <Label htmlFor="avatar-upload" className="cursor-pointer">
+                  <div className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                    {uploadingAvatar ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4" />
+                        Upload Photo
+                      </>
+                    )}
                   </div>
+                </Label>
+                <Input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                  disabled={uploadingAvatar}
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  JPG, PNG or GIF. Max size 2MB.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Personal Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Personal Information</CardTitle>
+            <CardDescription>Update your personal details</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="full_name">Full Name *</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="full_name"
+                    value={profileData.full_name}
+                    onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
+                    className="pl-9"
+                    placeholder="John Doe"
+                  />
                 </div>
+              </div>
 
-                <div className="grid gap-6 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="full_name">Full Name</Label>
-                    <Input
-                      id="full_name"
-                      value={profile.full_name}
-                      onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                      placeholder="e.g. John Smith"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={profile.phone}
-                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                      placeholder="e.g. 07123 456789"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
-                    type="email"
-                    value={profile.email}
+                    value={profileData.email}
                     disabled
-                    className="bg-muted"
+                    className="pl-9 bg-muted"
                   />
-                  <p className="text-xs text-muted-foreground">Email cannot be changed here. Contact admin to update.</p>
                 </div>
-                
-                <div className="pt-4 border-t">
-                  <Button onClick={handleSaveProfile} disabled={saving} className="w-full sm:w-auto">
-                    <Save className="w-4 h-4 mr-2" />
-                    {saving ? "Saving Changes..." : "Save Profile Changes"}
+                <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={profileData.phone || ""}
+                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                    className="pl-9"
+                    placeholder="+44 7700 900000"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Input
+                  id="role"
+                  value={profileData.role}
+                  disabled
+                  className="bg-muted capitalize"
+                />
+                <p className="text-xs text-muted-foreground">Contact admin to change role</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="address"
+                  value={profileData.address || ""}
+                  onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
+                  className="pl-9"
+                  placeholder="123 Main St, City, Postcode"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                value={profileData.bio || ""}
+                onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                placeholder="Tell us a bit about yourself..."
+                rows={4}
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={handleSaveProfile} disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Security Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Security Settings</CardTitle>
+            <CardDescription>Manage your password and security preferences</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!showPasswordChange ? (
+              <Button
+                variant="outline"
+                onClick={() => setShowPasswordChange(true)}
+              >
+                <Lock className="mr-2 h-4 w-4" />
+                Change Password
+              </Button>
+            ) : (
+              <div className="space-y-4">
+                {passwordError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{passwordError}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="current_password">Current Password</Label>
+                  <Input
+                    id="current_password"
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                    placeholder="Enter current password"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="new_password">New Password</Label>
+                  <Input
+                    id="new_password"
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                    placeholder="Enter new password (min 6 characters)"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirm_password">Confirm New Password</Label>
+                  <Input
+                    id="confirm_password"
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    placeholder="Confirm new password"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button onClick={handlePasswordChange} disabled={saving}>
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      "Update Password"
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowPasswordChange(false);
+                      setPasswordError("");
+                      setPasswordData({
+                        currentPassword: "",
+                        newPassword: "",
+                        confirmPassword: ""
+                      });
+                    }}
+                    disabled={saving}
+                  >
+                    Cancel
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="security">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Change Password</CardTitle>
-                  <CardDescription>Update your password to keep your account secure</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Alert>
-                    <Shield className="h-4 w-4" />
-                    <AlertDescription>
-                      Choose a strong password with at least 8 characters, including uppercase, lowercase, numbers, and symbols.
-                    </AlertDescription>
-                  </Alert>
-                  
-                  <div className="space-y-4 max-w-md">
-                    <div className="space-y-2">
-                      <Label htmlFor="current_password">Current Password (if changing manually)</Label>
-                      <Input
-                        id="current_password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={passwordForm.currentPassword}
-                        onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="new_password">New Password</Label>
-                      <Input
-                        id="new_password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={passwordForm.newPassword}
-                        onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirm_password">Confirm New Password</Label>
-                      <Input
-                        id="confirm_password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={passwordForm.confirmPassword}
-                        onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                      />
-                    </div>
-                    <Button onClick={handlePasswordChange} disabled={changingPassword} className="w-full sm:w-auto">
-                      {changingPassword ? "Updating Password..." : "Update Password"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Session Management</CardTitle>
-                  <CardDescription>Manage devices where you're currently logged in</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-                    <div>
-                      <p className="font-medium">Current Device</p>
-                      <p className="text-sm text-muted-foreground">Your active session</p>
-                    </div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">Active Now</Badge>
-                  </div>
-                  
-                  <div className="pt-2">
-                    <Button variant="destructive" onClick={handleSignOutAllDevices} className="w-full sm:w-auto">
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Sign Out All Devices
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      This will sign you out from all devices including this one. You'll need to log in again.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );
