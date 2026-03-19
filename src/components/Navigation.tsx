@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { 
   LayoutDashboard, Users, Briefcase, Calendar, 
   FileText, Settings, TrendingUp, Building, 
-  Package, Clock, DollarSign, Home, UserPlus, Shield, CalendarDays, Building2, BarChart3, Calculator
+  Package, Clock, DollarSign, Home, UserPlus, Shield, CalendarDays, Building2, BarChart3, Calculator, User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,7 @@ const menuItems = [
   { href: "/company", label: "Company", icon: Building2 },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/pricing", label: "Pricing", icon: Calculator },
+  { href: "/profile", label: "My Profile", icon: User },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

@@ -269,17 +269,9 @@ export default function SettingsPage() {
 
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="bg-white border">
-            <TabsTrigger value="profile" className="data-[state=active]:bg-primary data-[state=active]:text-white">
-              <User className="w-4 h-4 mr-2" />
-              Profile
-            </TabsTrigger>
             <TabsTrigger value="notifications" className="data-[state=active]:bg-primary data-[state=active]:text-white">
               <Bell className="w-4 h-4 mr-2" />
               Notifications
-            </TabsTrigger>
-            <TabsTrigger value="security" className="data-[state=active]:bg-primary data-[state=active]:text-white">
-              <Shield className="w-4 h-4 mr-2" />
-              Security
             </TabsTrigger>
             <TabsTrigger value="appearance" className="data-[state=active]:bg-primary data-[state=active]:text-white">
               <Palette className="w-4 h-4 mr-2" />
@@ -290,90 +282,6 @@ export default function SettingsPage() {
               Setup & QR Code
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="profile">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>Update your personal details and contact information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Profile Photo */}
-                <div className="space-y-2">
-                  <Label>Profile Photo</Label>
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      {profile.avatar_url ? (
-                        <img
-                          src={profile.avatar_url}
-                          alt="Profile"
-                          className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
-                        />
-                      ) : (
-                        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center border-2 border-gray-200">
-                          <User className="w-10 h-10 text-primary" />
-                        </div>
-                      )}
-                      <label
-                        htmlFor="avatar-upload"
-                        className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full cursor-pointer hover:bg-primary/90 transition-colors"
-                      >
-                        <Camera className="w-4 h-4" />
-                      </label>
-                      <input
-                        id="avatar-upload"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleAvatarUpload}
-                        disabled={uploading}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Upload a new photo</p>
-                      <p className="text-xs text-muted-foreground">JPG, PNG or GIF. Max 2MB.</p>
-                      {uploading && <p className="text-xs text-primary mt-1">Uploading...</p>}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="full_name">Full Name</Label>
-                  <Input
-                    id="full_name"
-                    value={profile.full_name}
-                    onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                    placeholder="John Smith"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={profile.email}
-                    disabled
-                    className="bg-muted"
-                  />
-                  <p className="text-xs text-muted-foreground">Email cannot be changed here. Contact admin to update.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={profile.phone}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                    placeholder="07123 456789"
-                  />
-                </div>
-                <Button onClick={handleSaveProfile} disabled={saving}>
-                  <Save className="w-4 h-4 mr-2" />
-                  {saving ? "Saving..." : "Save Changes"}
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           <TabsContent value="notifications">
             <Card>
@@ -450,108 +358,6 @@ export default function SettingsPage() {
                 </Button>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="security">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Change Password</CardTitle>
-                  <CardDescription>Update your password to keep your account secure</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Alert>
-                    <Shield className="h-4 w-4" />
-                    <AlertDescription>
-                      Choose a strong password with at least 8 characters, including uppercase, lowercase, numbers, and symbols.
-                    </AlertDescription>
-                  </Alert>
-                  <div className="space-y-2">
-                    <Label htmlFor="current_password">Current Password</Label>
-                    <Input
-                      id="current_password"
-                      type="password"
-                      value={passwordForm.currentPassword}
-                      onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="new_password">New Password</Label>
-                    <Input
-                      id="new_password"
-                      type="password"
-                      value={passwordForm.newPassword}
-                      onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm_password">Confirm New Password</Label>
-                    <Input
-                      id="confirm_password"
-                      type="password"
-                      value={passwordForm.confirmPassword}
-                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                    />
-                  </div>
-                  <Button onClick={handlePasswordChange} disabled={changingPassword}>
-                    {changingPassword ? "Updating..." : "Update Password"}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Active Sessions</CardTitle>
-                  <CardDescription>Manage devices where you're currently logged in</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium text-sm">Current Device</p>
-                        <p className="text-xs text-muted-foreground">Your active session</p>
-                      </div>
-                      <Badge variant="secondary">Active</Badge>
-                    </div>
-                  </div>
-                  <Button variant="destructive" onClick={handleSignOutAllDevices}>
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out All Devices
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    This will sign you out from all devices. You'll need to log in again.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Data & Privacy</CardTitle>
-                  <CardDescription>Export or delete your personal data</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Button variant="outline" onClick={handleExportData}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Export My Data
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Download all your personal data in JSON format
-                    </p>
-                  </div>
-                  <div className="border-t pt-4">
-                    <h4 className="font-medium text-sm mb-2 text-destructive">Danger Zone</h4>
-                    <Button variant="destructive" disabled>
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete Account
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Contact your administrator to delete your account
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
 
           <TabsContent value="appearance">
