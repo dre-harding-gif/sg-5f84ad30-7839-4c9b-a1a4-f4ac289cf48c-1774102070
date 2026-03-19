@@ -30,8 +30,9 @@ import Link from "next/link";
 import { supabase } from "@/integrations/supabase/client";
 import { PermissionGate } from "@/components/PermissionGate";
 import { useToast } from "@/hooks/use-toast";
+import { emailNotificationService } from "@/services/emailNotificationService";
 
-interface Job {
+export interface Job {
   id: string;
   job_number: string;
   title: string;
@@ -59,8 +60,7 @@ export default function JobsPage() {
     start_date: "",
     end_date: "",
     description: "",
-    priority: "normal",
-    generate_po: false
+    priority: "normal"
   });
   const [portalDialogOpen, setPortalDialogOpen] = useState(false);
   const [portalCredentials, setPortalCredentials] = useState({ email: "", password: "", portalUrl: "" });
@@ -183,26 +183,9 @@ export default function JobsPage() {
         
       if (jobError) throw jobError;
 
-      let poMsg = "";
-      if (formData.generate_po) {
-        const poNumber = await generateSequentialPONumber();
-        
-        const { error: poError } = await supabase.from("purchase_orders").insert({
-          po_number: poNumber,
-          job_id: jobData.id,
-          supplier: "TBD",
-          total_amount: 0,
-          status: "pending"
-        });
-        
-        if (!poError) {
-          poMsg = ` and P/O ${poNumber} generated.`;
-        }
-      }
-
       toast({
         title: "Job Created Successfully!",
-        description: `${formData.title} has been added${poMsg}`,
+        description: `${formData.title} has been added`,
       });
 
       setDialogOpen(false);
@@ -214,8 +197,7 @@ export default function JobsPage() {
         start_date: "",
         end_date: "",
         description: "",
-        priority: "normal",
-        generate_po: false
+        priority: "normal"
       });
       fetchJobs();
     } catch (error: any) {
@@ -483,18 +465,6 @@ You can now:
                         placeholder="Full description of work required, materials, special instructions..."
                         rows={4}
                       />
-                    </div>
-                    <div className="md:col-span-2 pt-2 border-t mt-2">
-                      <div className="flex items-center space-x-2 bg-blue-50/50 p-4 rounded-lg border border-blue-100">
-                        <Checkbox 
-                          id="generate_po" 
-                          checked={formData.generate_po}
-                          onCheckedChange={(checked) => setFormData({...formData, generate_po: checked as boolean})}
-                        />
-                        <Label htmlFor="generate_po" className="text-sm font-medium cursor-pointer">
-                          Automatically generate a P/O Number for this job
-                        </Label>
-                      </div>
                     </div>
                   </div>
                   <div className="flex gap-2 justify-end pt-4">

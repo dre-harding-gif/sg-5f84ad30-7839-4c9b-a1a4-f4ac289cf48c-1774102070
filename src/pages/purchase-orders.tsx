@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, FileText, DollarSign, Calendar, Trash2, Edit, Package, X } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { emailNotificationService } from "@/services/emailNotificationService";
 
 interface LineItem {
   id: string;

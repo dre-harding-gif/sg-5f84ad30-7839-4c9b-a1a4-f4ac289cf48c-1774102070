@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import { MapLauncher } from "@/components/MapLauncher";
 import Image from "next/image";
+import { emailNotificationService } from "@/services/emailNotificationService";
 
 interface CustomerJob {
   id: string;
