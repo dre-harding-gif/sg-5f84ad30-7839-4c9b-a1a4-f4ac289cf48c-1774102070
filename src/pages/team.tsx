@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Plus, Mail, Phone, CheckCircle2, Clock, Eye, EyeOff, Copy } from "lucide-react";
+import { Users, Plus, Mail, Phone, CheckCircle2, Clock, Eye, EyeOff, Copy, RefreshCw, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getUserPermissions, updateUserRole } from "@/services/roleService";
 import type { UserRole } from "@/services/roleService";
@@ -44,8 +44,15 @@ export default function TeamPage() {
   
   // Success dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
-  const [invitedCredentials, setInvitedCredentials] = useState({ email: "", password: "" });
+  const [invitedCredentials, setInvitedCredentials] = useState({ 
+    email: "", 
+    password: "",
+    emailSent: false 
+  });
   const [showPassword, setShowPassword] = useState(false);
+
+  // Resend state
+  const [resending, setResending] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTeamMembers();
@@ -66,7 +73,7 @@ export default function TeamPage() {
     if (data) {
       setTeamMembers(data.map(member => ({
         ...member,
-        status: "active" // Default mock status for all members since we don't have it in profiles yet
+        status: "active"
       })) as TeamMember[]);
     }
     setLoading(false);
@@ -94,39 +101,39 @@ export default function TeamPage() {
     setInviting(true);
     
     try {
-      // Call the Edge Function to create the user
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: {
           email: inviteForm.email,
           fullName: inviteForm.fullName,
-          role: inviteForm.role
+          role: inviteForm.role,
+          resend: false
         }
       });
 
       if (error) throw error;
 
       if (data.success && data.tempPassword) {
-        // Show success dialog with credentials
         setInvitedCredentials({
           email: inviteForm.email,
-          password: data.tempPassword
+          password: data.tempPassword,
+          emailSent: data.emailSent || false
         });
         setSuccessDialogOpen(true);
         setInviteDialogOpen(false);
         
-        // Reset form
         setInviteForm({
           email: "",
           fullName: "",
           role: "builder"
         });
         
-        // Refresh team list
         fetchTeamMembers();
         
         toast({
-          title: "User Invited Successfully",
-          description: "Share the credentials with the new team member"
+          title: data.emailSent ? "✅ Invitation Sent!" : "✅ User Created",
+          description: data.emailSent 
+            ? "Email sent with login instructions" 
+            : "Share credentials manually (SMTP not configured)"
         });
       } else {
         throw new Error(data.error || "Failed to create user account");
@@ -139,6 +146,49 @@ export default function TeamPage() {
       });
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleResendInvitation(member: TeamMember) {
+    setResending(member.id);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: {
+          email: member.email,
+          fullName: member.full_name,
+          role: member.role,
+          resend: true
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success && data.tempPassword) {
+        setInvitedCredentials({
+          email: member.email,
+          password: data.tempPassword,
+          emailSent: data.emailSent || false
+        });
+        setSuccessDialogOpen(true);
+        
+        toast({
+          title: data.emailSent ? "✅ Invitation Resent!" : "✅ Credentials Reset",
+          description: data.emailSent 
+            ? `Email sent to ${member.email}` 
+            : "Share new credentials manually (SMTP not configured)"
+        });
+      } else {
+        throw new Error(data.error || "Failed to resend invitation");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Resend Failed",
+        description: error.message || "Failed to resend invitation",
+        variant: "destructive"
+      });
+    } finally {
+      setResending(null);
     }
   }
 
@@ -319,7 +369,24 @@ Login at: ${window.location.origin}
                         <Badge className="bg-green-100 text-green-800">Active</Badge>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm">View Details</Button>
+                        <div className="flex gap-2">
+                          <PermissionGate require="manage_team">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleResendInvitation(member)}
+                              disabled={resending === member.id}
+                              className="text-blue-600 border-blue-500 hover:bg-blue-50"
+                            >
+                              {resending === member.id ? (
+                                <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <Send className="h-4 w-4 mr-1" />
+                              )}
+                              Resend Invite
+                            </Button>
+                          </PermissionGate>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -495,13 +562,27 @@ Login at: ${window.location.origin}
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-green-600">
                 <CheckCircle2 className="h-5 w-5" />
-                User Invited Successfully!
+                {invitedCredentials.emailSent ? "Invitation Sent!" : "Credentials Generated"}
               </DialogTitle>
               <DialogDescription>
-                Share these credentials with the new team member
+                {invitedCredentials.emailSent 
+                  ? "Email sent with login instructions" 
+                  : "Share these credentials with the team member (SMTP not configured)"}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {invitedCredentials.emailSent && (
+                <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
+                  <p className="text-sm text-green-800 flex items-center gap-2">
+                    <Send className="h-4 w-4" />
+                    <strong>Email sent to {invitedCredentials.email}</strong>
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">
+                    They'll receive a password reset link. Save the credentials below as backup.
+                  </p>
+                </div>
+              )}
+
               <div className="bg-muted p-4 rounded-lg space-y-3">
                 <div>
                   <Label className="text-xs text-muted-foreground">Email</Label>
@@ -524,9 +605,20 @@ Login at: ${window.location.origin}
                 </div>
               </div>
 
-              <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg">
-                <p className="text-sm text-orange-800">
-                  ⚠️ <strong>Important:</strong> Ask the user to change their password after first login
+              {!invitedCredentials.emailSent && (
+                <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg">
+                  <p className="text-sm text-orange-800">
+                    ⚠️ <strong>SMTP not configured:</strong> Automated emails are disabled. Share credentials manually.
+                  </p>
+                  <p className="text-xs text-orange-700 mt-1">
+                    See docs/EMAIL_SETUP_GUIDE.md to enable automated invitation emails.
+                  </p>
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  💡 <strong>Important:</strong> Ask the user to change their password after first login (Settings → Security)
                 </p>
               </div>
 

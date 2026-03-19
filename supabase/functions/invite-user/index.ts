@@ -13,12 +13,12 @@ serve(async (req) => {
   }
 
   try {
-    const { email, fullName, role } = await req.json();
+    const { email, fullName, role, resend = false } = await req.json();
 
     // Validate required fields
-    if (!email || !fullName || !role) {
+    if (!email) {
       return new Response(
-        JSON.stringify({ success: false, error: "Missing required fields" }),
+        JSON.stringify({ success: false, error: "Email is required" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
@@ -35,17 +35,79 @@ serve(async (req) => {
       }
     );
 
+    const siteUrl = Deno.env.get("SITE_URL") || "https://yourdomain.com";
+
+    // If resending, check if user exists
+    if (resend) {
+      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+      const existingUser = existingUsers?.users.find(u => u.email === email);
+
+      if (existingUser) {
+        // Generate a new temporary password
+        const tempPassword = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+
+        // Update user password
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+          existingUser.id,
+          { password: tempPassword }
+        );
+
+        if (updateError) {
+          console.error("Password update error:", updateError);
+          return new Response(
+            JSON.stringify({ success: false, error: updateError.message }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          );
+        }
+
+        // Send password recovery email (this triggers Supabase's email)
+        const { error: recoveryError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+          redirectTo: `${siteUrl}/reset-password`,
+        });
+
+        // Note: recoveryError may occur if SMTP isn't configured, but we still provide manual credentials
+        const emailSent = !recoveryError;
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            email,
+            tempPassword,
+            userId: existingUser.id,
+            fullName: existingUser.user_metadata?.full_name || fullName,
+            role: existingUser.user_metadata?.role || role,
+            loginUrl: siteUrl,
+            emailSent,
+            message: emailSent 
+              ? "Invitation email sent! Password reset link delivered." 
+              : "User credentials updated. Share manually (SMTP not configured).",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } else {
+        return new Response(
+          JSON.stringify({ success: false, error: "User not found" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
+        );
+      }
+    }
+
+    // Creating new user
+    if (!fullName || !role) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Full name and role are required for new users" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
     // Generate a secure temporary password (16 characters)
     const tempPassword = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 
-    // Get the site URL for the login link
-    const siteUrl = Deno.env.get("SITE_URL") || "https://yourdomain.com";
-
-    // Create the user account with email sending enabled
+    // Create the user account
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
-      email_confirm: true, // Auto-confirm email
+      email_confirm: true, // Auto-confirm email to allow immediate login
       user_metadata: {
         full_name: fullName,
       },
@@ -76,24 +138,13 @@ serve(async (req) => {
       );
     }
 
-    // Send custom invitation email with credentials
-    // Note: This uses Supabase's built-in email templates
-    // You'll need to customize the email template in Supabase Dashboard:
-    // Authentication > Email Templates > Invite user
-    
-    // Generate password reset link (user can change password after first login)
-    const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: email,
+    // Try to send invitation email via password reset
+    const { error: emailError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+      redirectTo: `${siteUrl}/reset-password`,
     });
 
-    if (resetError) {
-      console.error("Reset link error:", resetError);
-    }
+    const emailSent = !emailError;
 
-    // For now, we'll return the credentials to be shown in the UI
-    // Supabase will send a confirmation email automatically since email_confirm: true
-    
     return new Response(
       JSON.stringify({
         success: true,
@@ -103,7 +154,10 @@ serve(async (req) => {
         fullName,
         role,
         loginUrl: siteUrl,
-        message: "User created successfully. Credentials should be shared manually via the UI dialog.",
+        emailSent,
+        message: emailSent
+          ? "User created and invitation email sent!"
+          : "User created. Share credentials manually (SMTP not configured).",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

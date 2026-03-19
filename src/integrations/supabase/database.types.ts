@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -72,6 +72,7 @@ export type Database = {
           mot_expiry: string
           notes: string | null
           registration: string
+          status: string | null
           updated_at: string | null
           year: number
         }
@@ -86,6 +87,7 @@ export type Database = {
           mot_expiry: string
           notes?: string | null
           registration: string
+          status?: string | null
           updated_at?: string | null
           year: number
         }
@@ -100,6 +102,7 @@ export type Database = {
           mot_expiry?: string
           notes?: string | null
           registration?: string
+          status?: string | null
           updated_at?: string | null
           year?: number
         }
@@ -214,6 +217,122 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_issues: {
+        Row: {
+          description: string
+          id: string
+          issue_type: string
+          priority: string
+          reported_by: string | null
+          reported_date: string | null
+          resolved_date: string | null
+          status: string
+          vehicle_id: string
+        }
+        Insert: {
+          description: string
+          id?: string
+          issue_type: string
+          priority?: string
+          reported_by?: string | null
+          reported_date?: string | null
+          resolved_date?: string | null
+          status?: string
+          vehicle_id: string
+        }
+        Update: {
+          description?: string
+          id?: string
+          issue_type?: string
+          priority?: string
+          reported_by?: string | null
+          reported_date?: string | null
+          resolved_date?: string | null
+          status?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_issues_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_issues_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_issues_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "company_fleet"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_service_bookings: {
+        Row: {
+          booked_by: string | null
+          booking_type: string
+          created_at: string | null
+          end_date: string
+          id: string
+          notes: string | null
+          start_date: string
+          status: string
+          vehicle_id: string
+        }
+        Insert: {
+          booked_by?: string | null
+          booking_type: string
+          created_at?: string | null
+          end_date: string
+          id?: string
+          notes?: string | null
+          start_date: string
+          status?: string
+          vehicle_id: string
+        }
+        Update: {
+          booked_by?: string | null
+          booking_type?: string
+          created_at?: string | null
+          end_date?: string
+          id?: string
+          notes?: string | null
+          start_date?: string
+          status?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_service_bookings_booked_by_fkey"
+            columns: ["booked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_service_bookings_booked_by_fkey"
+            columns: ["booked_by"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_service_bookings_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "company_fleet"
             referencedColumns: ["id"]
           },
         ]
