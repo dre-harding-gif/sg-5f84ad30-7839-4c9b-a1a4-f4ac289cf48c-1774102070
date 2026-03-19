@@ -42,6 +42,7 @@ interface Job {
   end_date: string;
   customer_name?: string;
   customer_id?: string;
+  po_numbers?: string[];
 }
 
 export default function JobsPage() {
@@ -75,7 +76,8 @@ export default function JobsPage() {
         .from("jobs")
         .select(`
           *,
-          customer:profiles!jobs_customer_id_fkey(full_name)
+          customer:profiles!jobs_customer_id_fkey(full_name),
+          purchase_orders(po_number)
         `)
         .order("created_at", { ascending: false });
 
@@ -91,7 +93,8 @@ export default function JobsPage() {
         start_date: j.start_date,
         end_date: j.end_date,
         customer_name: (j.customer as any)?.full_name || "Unknown",
-        customer_id: j.customer_id
+        customer_id: j.customer_id,
+        po_numbers: (j.purchase_orders || []).map((po: any) => po.po_number)
       }));
 
       setJobs(formattedJobs);
@@ -151,15 +154,17 @@ export default function JobsPage() {
 
       let poMsg = "";
       if (formData.generate_po) {
-        const { data: poNumber } = await supabase.rpc("generate_po_number");
-        if (poNumber) {
-          await supabase.from("purchase_orders").insert({
-            po_number: poNumber,
-            job_id: jobData.id,
-            supplier: "TBD",
-            total_amount: 0,
-            status: "pending"
-          });
+        const poNumber = await generateSequentialPONumber();
+        
+        const { error: poError } = await supabase.from("purchase_orders").insert({
+          po_number: poNumber,
+          job_id: jobData.id,
+          supplier: "TBD",
+          total_amount: 0,
+          status: "pending"
+        });
+        
+        if (!poError) {
           poMsg = ` and P/O ${poNumber} generated.`;
         }
       }
@@ -193,8 +198,7 @@ export default function JobsPage() {
 
   async function handleGeneratePO(jobId: string, jobTitle: string) {
     try {
-      const { data: poNumber, error } = await supabase.rpc("generate_po_number");
-      if (error) throw error;
+      const poNumber = await generateSequentialPONumber();
       
       const { error: insertError } = await supabase.from("purchase_orders").insert({
         po_number: poNumber,
@@ -210,6 +214,9 @@ export default function JobsPage() {
         title: "P/O Generated",
         description: `P/O Number ${poNumber} created for ${jobTitle}. View it in the Purchase Orders page.`,
       });
+      
+      // Refresh jobs to show new P/O number
+      await fetchJobs();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
@@ -512,6 +519,15 @@ You can now:
                         <Badge variant="outline" className={getStatusColor(job.status)}>
                           {job.status.replace('_', ' ').toUpperCase()}
                         </Badge>
+                        {job.po_numbers && job.po_numbers.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {job.po_numbers.map((poNum, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs font-mono bg-blue-50 text-blue-700 border-blue-200">
+                                {poNum}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <h3 className="text-lg font-bold text-slate-900 mt-2 hover:text-primary">
                         <Link href={`/jobs/${job.id}`}>{job.title}</Link>

@@ -82,6 +82,7 @@ export default function JobDetailPage() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxPhotos, setLightboxPhotos] = useState<any[]>([]);
+  const [purchaseOrdersList, setPurchaseOrdersList] = useState<any[]>([]);
   
   // Time Log States
   const [showTimeLogDialog, setShowTimeLogDialog] = useState(false);
@@ -150,6 +151,7 @@ export default function JobDetailPage() {
         await fetchTimeLogs();
         await fetchDocuments();
         await fetchCommunications();
+        await fetchPurchaseOrders();
         setLoading(false);
       }
     }
@@ -201,6 +203,82 @@ export default function JobDetailPage() {
       setCommunications((data as unknown as CustomerCommunication[]) || []);
     } catch (error) {
       console.error("Error fetching communications:", error);
+    }
+  }
+
+  async function fetchPurchaseOrders() {
+    if (!id) return;
+    try {
+      const { data, error } = await supabase
+        .from("purchase_orders")
+        .select("*")
+        .eq("job_id", id as string)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      setPurchaseOrdersList(data || []);
+    } catch (error) {
+      console.error("Error fetching purchase orders:", error);
+    }
+  }
+
+  async function generateSequentialPONumber(): Promise<string> {
+    try {
+      const { data, error } = await supabase
+        .from("purchase_orders")
+        .select("po_number")
+        .order("po_number", { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        return "PO-000001";
+      }
+
+      const lastPO = data[0].po_number;
+      const match = lastPO.match(/PO-(\d+)/);
+      
+      if (!match) {
+        return "PO-000001";
+      }
+
+      const lastNumber = parseInt(match[1], 10);
+      const nextNumber = lastNumber + 1;
+      
+      return `PO-${nextNumber.toString().padStart(6, "0")}`;
+    } catch (error) {
+      console.error("Error generating PO number:", error);
+      return `PO-${Date.now().toString().slice(-6)}`;
+    }
+  }
+
+  async function handleGeneratePOForJob() {
+    try {
+      const poNumber = await generateSequentialPONumber();
+      
+      const { error } = await supabase.from("purchase_orders").insert({
+        po_number: poNumber,
+        job_id: id as string,
+        supplier: "TBD (Update in POs page)",
+        total_amount: 0,
+        status: "pending"
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "P/O Generated",
+        description: `P/O Number ${poNumber} created successfully. View it in the Purchase Orders page.`,
+      });
+      
+      await fetchPurchaseOrders();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   }
 
@@ -610,22 +688,49 @@ export default function JobDetailPage() {
               </Card>
 
               <Card>
-                <CardHeader>
-                  <CardTitle>Assigned Team</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Purchase Orders</CardTitle>
+                    <CardDescription>P/O numbers for this job</CardDescription>
+                  </div>
+                  <Button size="sm" onClick={handleGeneratePOForJob} className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Generate P/O
+                  </Button>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {job.team.map((member) => (
-                    <div key={member.id} className="flex items-center gap-3 border p-3 rounded-lg">
-                      <Avatar>
-                        <AvatarImage src={member.avatar} />
-                        <AvatarFallback>{member.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{member.name}</p>
-                        <p className="text-sm text-muted-foreground">{member.role}</p>
+                <CardContent>
+                  {purchaseOrdersList.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Receipt className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                      <p className="text-sm">No P/O numbers generated yet</p>
+                      <p className="text-xs">Click "Generate P/O" to create one</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {purchaseOrdersList.map((po) => (
+                        <div key={po.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                          <div className="flex items-center gap-3">
+                            <Receipt className="w-5 h-5 text-blue-600" />
+                            <div>
+                              <p className="font-mono font-semibold text-sm">{po.po_number}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {po.supplier} • {po.status.toUpperCase()}
+                              </p>
+                            </div>
+                          </div>
+                          <Badge variant="secondary" className="font-mono">
+                            £{(po.total_amount || 0).toLocaleString()}
+                          </Badge>
+                        </div>
+                      ))}
+                      <div className="pt-2 border-t">
+                        <Link href="/purchase-orders" className="text-sm text-primary hover:underline flex items-center gap-1">
+                          View all in Purchase Orders page
+                          <ArrowLeft className="w-3 h-3 rotate-180" />
+                        </Link>
                       </div>
                     </div>
-                  ))}
+                  )}
                 </CardContent>
               </Card>
             </div>
