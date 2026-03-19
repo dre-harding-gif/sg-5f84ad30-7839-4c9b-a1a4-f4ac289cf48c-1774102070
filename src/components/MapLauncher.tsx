@@ -4,9 +4,11 @@ import { MapPin } from "lucide-react";
 interface MapLauncherProps {
   address: string;
   size?: "sm" | "default" | "lg";
+  className?: string;
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
 }
 
-export function MapLauncher({ address, size = "default" }: MapLauncherProps) {
+export function MapLauncher({ address, size = "default", className, variant = "outline" }: MapLauncherProps) {
   const handleOpenMaps = () => {
     // Encode address for URL
     const encodedAddress = encodeURIComponent(address);
@@ -33,7 +35,7 @@ export function MapLauncher({ address, size = "default" }: MapLauncherProps) {
   };
 
   return (
-    <Button onClick={handleOpenMaps} variant="outline" size={size}>
+    <Button onClick={handleOpenMaps} variant={variant} size={size} className={className}>
       <MapPin className="w-4 h-4 mr-2" />
       Open in Maps
     </Button>
