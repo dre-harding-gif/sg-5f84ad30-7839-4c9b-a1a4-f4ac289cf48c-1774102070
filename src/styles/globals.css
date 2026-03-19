@@ -8,71 +8,74 @@
   :root {
     /* Harding Homes Brand Colors */
     --background: 0 0% 100%;
-    --foreground: 222 84% 15%;
+    --foreground: 0 0% 10%;
     
     --card: 0 0% 100%;
-    --card-foreground: 222 84% 15%;
+    --card-foreground: 0 0% 10%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 222 84% 15%;
+    --popover-foreground: 0 0% 10%;
     
-    /* Primary: Harding Blue */
-    --primary: 217 91% 33%;
+    /* Primary: Harding Gold */
+    --primary: 43 65% 53%;
     --primary-foreground: 0 0% 100%;
     
-    /* Secondary: Professional Navy */
-    --secondary: 222 84% 15%;
+    /* Secondary: Charcoal/Black */
+    --secondary: 0 0% 15%;
     --secondary-foreground: 0 0% 100%;
     
-    /* Accent: Bright Blue */
-    --accent: 217 91% 60%;
-    --accent-foreground: 0 0% 100%;
+    /* Accent: Harding Grey */
+    --accent: 0 0% 60%;
+    --accent-foreground: 0 0% 10%;
     
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
     
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 33%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 43 65% 53%;
     
     --radius: 0.5rem;
 
     /* Custom Harding Homes Gradients */
-    --gradient-brand: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
-    --gradient-hero: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+    --gradient-brand: linear-gradient(135deg, #000000 0%, #333333 50%, #d4af37 100%);
+    --gradient-hero: linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 50%, #d4af37 100%);
   }
 
   .dark {
-    --background: 222 47% 11%;
+    --background: 0 0% 5%;
     --foreground: 0 0% 95%;
     
-    --card: 222 47% 11%;
+    --card: 0 0% 8%;
     --card-foreground: 0 0% 95%;
     
-    --popover: 222 47% 11%;
+    --popover: 0 0% 8%;
     --popover-foreground: 0 0% 95%;
     
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
+    /* Primary: Harding Gold */
+    --primary: 43 65% 53%;
+    --primary-foreground: 0 0% 10%;
     
-    --secondary: 217 33% 17%;
+    /* Secondary: Dark Grey */
+    --secondary: 0 0% 15%;
     --secondary-foreground: 0 0% 95%;
     
-    --accent: 217 33% 17%;
+    /* Accent: Harding Grey */
+    --accent: 0 0% 30%;
     --accent-foreground: 0 0% 95%;
     
     --destructive: 0 63% 31%;
     --destructive-foreground: 0 0% 95%;
     
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
     
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 217 91% 60%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 43 65% 53%;
   }
 }
 

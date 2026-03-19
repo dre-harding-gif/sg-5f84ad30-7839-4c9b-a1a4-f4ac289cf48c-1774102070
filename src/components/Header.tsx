@@ -23,11 +23,11 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <div className="flex items-center gap-3">
           <Image 
-            src="/harding-homes-logo.svg" 
+            src="/harding-homes-logo.jpg" 
             alt="Harding Homes" 
             width={180} 
             height={40}
-            className="h-8 sm:h-10 w-auto"
+            className="h-8 sm:h-10 w-auto object-contain rounded-md"
           />
         </div>
         

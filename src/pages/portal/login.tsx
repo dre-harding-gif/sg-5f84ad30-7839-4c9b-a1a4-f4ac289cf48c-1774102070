@@ -82,13 +82,13 @@ export default function CustomerLogin() {
       <div className="w-full max-w-md space-y-6">
         {/* Logo */}
         <div className="text-center">
-          <div className="inline-block bg-white p-6 rounded-2xl shadow-xl mb-4">
+          <div className="inline-block bg-black p-4 rounded-2xl shadow-xl mb-4 border border-white/10">
             <Image 
-              src="/harding-homes-logo.svg" 
+              src="/harding-homes-logo.jpg" 
               alt="Harding Homes" 
               width={200} 
               height={60}
-              className="h-12 w-auto"
+              className="h-16 w-auto object-contain"
             />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Customer Portal</h1>

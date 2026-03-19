@@ -275,13 +275,15 @@ export default function CustomerPortal() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Image 
-                src="/harding-homes-logo.svg" 
-                alt="Harding Homes" 
-                width={160} 
-                height={40}
-                className="h-10 w-auto"
-              />
+              <div className="bg-black/20 p-2 rounded-lg">
+                <Image 
+                  src="/harding-homes-logo.jpg" 
+                  alt="Harding Homes" 
+                  width={160} 
+                  height={40}
+                  className="h-12 w-auto object-contain rounded-sm"
+                />
+              </div>
               <div className="hidden md:block">
                 <p className="text-sm text-blue-100">Customer Portal</p>
               </div>
