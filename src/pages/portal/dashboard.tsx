@@ -64,7 +64,7 @@ export default function CustomerPortal() {
       }
 
       const { data: customerData, error: customerError } = await supabase
-        .from("customers")
+        .from("profiles")
         .select("*")
         .eq("email", session.user.email)
         .single();
@@ -287,7 +287,7 @@ export default function CustomerPortal() {
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
-                <p className="font-medium">{customer?.name}</p>
+                <p className="font-medium">{customer?.full_name}</p>
                 <p className="text-sm text-blue-100">{customer?.email}</p>
               </div>
               <Button variant="outline" size="sm" onClick={handleSignOut} className="bg-white/10 border-white/20 text-white hover:bg-white/20">
