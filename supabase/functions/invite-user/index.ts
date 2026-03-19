@@ -6,6 +6,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface InviteRequest {
+  email: string;
+  fullName: string;
+  role: string;
+  password?: string;
+  resend?: boolean;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -13,158 +21,219 @@ serve(async (req) => {
   }
 
   try {
-    const { email, fullName, role, resend = false } = await req.json();
+    // Parse request body
+    const { email, fullName, role, password, resend = false }: InviteRequest = await req.json();
+
+    console.log("Invite request:", { email, fullName, role, resend });
 
     // Validate required fields
-    if (!email) {
+    if (!email || !fullName || !role) {
+      console.error("Missing required fields:", { email: !!email, fullName: !!fullName, role: !!role });
       return new Response(
-        JSON.stringify({ success: false, error: "Email is required" }),
+        JSON.stringify({ 
+          success: false, 
+          error: "Missing required fields: email, fullName, and role are required" 
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    // Create Supabase admin client with service role key
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    // Get Supabase environment variables
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    const siteUrl = Deno.env.get("SITE_URL") || "https://yourdomain.com";
-
-    // If resending, check if user exists
-    if (resend) {
-      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-      const existingUser = existingUsers?.users.find(u => u.email === email);
-
-      if (existingUser) {
-        // Generate a new temporary password
-        const tempPassword = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-
-        // Update user password
-        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-          existingUser.id,
-          { password: tempPassword }
-        );
-
-        if (updateError) {
-          console.error("Password update error:", updateError);
-          return new Response(
-            JSON.stringify({ success: false, error: updateError.message }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-          );
-        }
-
-        // Send password recovery email (this triggers Supabase's email)
-        const { error: recoveryError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-          redirectTo: `${siteUrl}/reset-password`,
-        });
-
-        // Note: recoveryError may occur if SMTP isn't configured, but we still provide manual credentials
-        const emailSent = !recoveryError;
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            email,
-            tempPassword,
-            userId: existingUser.id,
-            fullName: existingUser.user_metadata?.full_name || fullName,
-            role: existingUser.user_metadata?.role || role,
-            loginUrl: siteUrl,
-            emailSent,
-            message: emailSent 
-              ? "Invitation email sent! Password reset link delivered." 
-              : "User credentials updated. Share manually (SMTP not configured).",
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } else {
-        return new Response(
-          JSON.stringify({ success: false, error: "User not found" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
-        );
-      }
-    }
-
-    // Creating new user
-    if (!fullName || !role) {
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Missing Supabase environment variables");
       return new Response(
-        JSON.stringify({ success: false, error: "Full name and role are required for new users" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        JSON.stringify({ 
+          success: false, 
+          error: "Server configuration error: Missing Supabase credentials" 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
-    // Generate a secure temporary password (16 characters)
-    const tempPassword = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-
-    // Create the user account
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: tempPassword,
-      email_confirm: true, // Auto-confirm email to allow immediate login
-      user_metadata: {
-        full_name: fullName,
+    // Create Supabase admin client
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
       },
     });
 
-    if (authError) {
-      console.error("Auth error:", authError);
-      return new Response(
-        JSON.stringify({ success: false, error: authError.message }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+    // Generate temporary password if not provided
+    const tempPassword = password || `Temp${Math.random().toString(36).slice(-8)}!`;
+
+    let userId: string;
+    let emailSent = false;
+    let isNewUser = false;
+
+    if (resend) {
+      console.log("Resending invitation for existing user:", email);
+      
+      // Find existing user by email
+      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      
+      if (listError) {
+        console.error("Error listing users:", listError);
+        throw new Error(`Failed to list users: ${listError.message}`);
+      }
+
+      const existingUser = users?.find(u => u.email === email);
+      
+      if (!existingUser) {
+        console.error("User not found for resend:", email);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: "User not found. Please create the user first." 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
+        );
+      }
+
+      userId = existingUser.id;
+      console.log("Found existing user:", userId);
+
+      // Update user password
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        userId,
+        { password: tempPassword }
       );
+
+      if (updateError) {
+        console.error("Error updating user password:", updateError);
+        throw new Error(`Failed to update password: ${updateError.message}`);
+      }
+
+      console.log("Password updated successfully");
+
+      // Try to send password recovery email
+      try {
+        const { error: recoveryError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+          redirectTo: `${Deno.env.get("SITE_URL") || "https://yourdomain.com"}/reset-password`,
+        });
+
+        if (recoveryError) {
+          console.warn("Password recovery email failed (SMTP may not be configured):", recoveryError.message);
+          emailSent = false;
+        } else {
+          console.log("Password recovery email sent successfully");
+          emailSent = true;
+        }
+      } catch (emailError) {
+        console.warn("Email sending failed:", emailError);
+        emailSent = false;
+      }
+
+    } else {
+      console.log("Creating new user:", email);
+      isNewUser = true;
+
+      // Check if user already exists
+      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      
+      if (listError) {
+        console.error("Error listing users:", listError);
+        throw new Error(`Failed to list users: ${listError.message}`);
+      }
+
+      const existingUser = users?.find(u => u.email === email);
+      
+      if (existingUser) {
+        console.error("User already exists:", email);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: "User with this email already exists. Use 'Resend Invite' instead." 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 409 }
+        );
+      }
+
+      // Create new user
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: fullName,
+        },
+      });
+
+      if (createError) {
+        console.error("Error creating user:", createError);
+        throw new Error(`Failed to create user: ${createError.message}`);
+      }
+
+      if (!newUser.user) {
+        console.error("User creation returned no user object");
+        throw new Error("User creation failed: No user object returned");
+      }
+
+      userId = newUser.user.id;
+      console.log("User created successfully:", userId);
+
+      // Update profile with role
+      const { error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .update({ role })
+        .eq("id", userId);
+
+      if (profileError) {
+        console.error("Error updating profile:", profileError);
+        // Don't fail the whole operation if profile update fails
+        console.warn("Profile update failed, but user was created successfully");
+      } else {
+        console.log("Profile updated with role:", role);
+      }
+
+      // Try to send welcome email via password recovery
+      try {
+        const { error: recoveryError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+          redirectTo: `${Deno.env.get("SITE_URL") || "https://yourdomain.com"}/reset-password`,
+        });
+
+        if (recoveryError) {
+          console.warn("Welcome email failed (SMTP may not be configured):", recoveryError.message);
+          emailSent = false;
+        } else {
+          console.log("Welcome email sent successfully");
+          emailSent = true;
+        }
+      } catch (emailError) {
+        console.warn("Email sending failed:", emailError);
+        emailSent = false;
+      }
     }
 
-    // Update the user's profile with their role
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .update({
-        role,
-        full_name: fullName,
-      })
-      .eq("id", authData.user.id);
+    // Return success response
+    const response = {
+      success: true,
+      userId,
+      email,
+      tempPassword: emailSent ? undefined : tempPassword, // Only return password if email wasn't sent
+      emailSent,
+      message: emailSent 
+        ? `${resend ? 'Invitation resent' : 'Invitation sent'} successfully via email`
+        : `User ${resend ? 'updated' : 'created'} successfully. Share credentials manually.`,
+    };
 
-    if (profileError) {
-      console.error("Profile error:", profileError);
-      return new Response(
-        JSON.stringify({ success: false, error: profileError.message }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-      );
-    }
-
-    // Try to send invitation email via password reset
-    const { error: emailError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-      redirectTo: `${siteUrl}/reset-password`,
-    });
-
-    const emailSent = !emailError;
+    console.log("Success response:", { ...response, tempPassword: response.tempPassword ? "[REDACTED]" : undefined });
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        email,
-        tempPassword,
-        userId: authData.user.id,
-        fullName,
-        role,
-        loginUrl: siteUrl,
-        emailSent,
-        message: emailSent
-          ? "User created and invitation email sent!"
-          : "User created. Share credentials manually (SMTP not configured).",
-      }),
+      JSON.stringify(response),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
-    console.error("Error:", error);
+
+  } catch (error: any) {
+    console.error("Unexpected error in invite-user function:", error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ 
+        success: false, 
+        error: error.message || "An unexpected error occurred",
+        details: error.toString(),
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
