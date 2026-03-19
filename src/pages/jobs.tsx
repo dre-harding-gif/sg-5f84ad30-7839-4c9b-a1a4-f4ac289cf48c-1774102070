@@ -105,6 +105,37 @@ export default function JobsPage() {
     }
   }
 
+  async function generateSequentialPONumber(): Promise<string> {
+    try {
+      const { data, error } = await supabase
+        .from("purchase_orders")
+        .select("po_number")
+        .order("po_number", { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        return "PO-000001";
+      }
+
+      const lastPO = data[0].po_number;
+      const match = lastPO.match(/PO-(\d+)/);
+      
+      if (!match) {
+        return "PO-000001";
+      }
+
+      const lastNumber = parseInt(match[1], 10);
+      const nextNumber = lastNumber + 1;
+      
+      return `PO-${nextNumber.toString().padStart(6, "0")}`;
+    } catch (error) {
+      console.error("Error generating PO number:", error);
+      return `PO-${Date.now().toString().slice(-6)}`;
+    }
+  }
+
   async function handleCreateJob(e: React.FormEvent) {
     e.preventDefault();
     
@@ -258,7 +289,7 @@ export default function JobsPage() {
     try {
       // Get customer details
       const { data: customer, error: customerError } = await (supabase as any)
-        .from("customers")
+        .from("profiles")
         .select("*")
         .eq("id", customerId)
         .single();
@@ -272,7 +303,7 @@ export default function JobsPage() {
       const { data, error } = await supabase.functions.invoke('customer-portal-setup', {
         body: {
           customerEmail: customer.email,
-          customerName: customer.name,
+          customerName: customer.full_name,
           customerId: customer.id,
           jobId: jobId
         }
