@@ -82,7 +82,10 @@ export default function PurchaseOrders() {
         .neq("status", "cancelled")
         .order("created_at", { ascending: false });
 
-      setPurchaseOrders(Array.isArray(poData) ? poData : []);
+      setPurchaseOrders(Array.isArray(poData) ? poData.map((po: any) => ({
+        ...po,
+        items: Array.isArray(po.items) ? po.items : []
+      })) : []);
       setJobs(Array.isArray(jobsData) ? jobsData : []);
     } catch (error) {
       console.error("Load error:", error);
@@ -164,7 +167,7 @@ export default function PurchaseOrders() {
           total_amount: totalAmount,
           notes: newPO.notes || null,
           status: "pending",
-          items: lineItems
+          items: lineItems as any
         }]);
 
       if (insertError) throw insertError;
@@ -211,7 +214,7 @@ export default function PurchaseOrders() {
         .update({
           supplier: selectedPO.supplier,
           notes: selectedPO.notes,
-          items: lineItems,
+          items: lineItems as any,
           total_amount: totalAmount
         })
         .eq("id", selectedPO.id);
