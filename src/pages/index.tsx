@@ -70,10 +70,10 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    checkAuth();
+    checkAuthAndLoad();
   }, []);
 
-  const checkAuth = async () => {
+  const checkAuthAndLoad = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
@@ -82,11 +82,7 @@ export default function Dashboard() {
       return;
     }
     
-    setUser(session.user);
-    fetchUserRole(session.user.id);
-    fetchStats();
-    fetchRecentJobs();
-    fetchUpcomingJobs();
+    await loadDashboardData();
   };
 
   async function loadDashboardData() {
