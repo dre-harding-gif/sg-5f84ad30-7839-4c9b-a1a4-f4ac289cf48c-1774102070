@@ -107,25 +107,30 @@ export default function JobsPage() {
     
     try {
       // 1. Get or create customer profile
-      let customerId = "";
+      let customerId = null;
       
-      const { data: customerData, error: customerError } = await supabase
-        .from("profiles")
-        .insert([{
-          full_name: formData.customer_name,
-          role: "customer"
-        }])
-        .select("id")
-        .single();
-        
-      if (customerError) throw customerError;
-      customerId = customerData.id;
+      try {
+        const { data: customerData, error: customerError } = await (supabase as any)
+          .from("profiles")
+          .insert([{
+            full_name: formData.customer_name,
+            role: "customer"
+          }])
+          .select("id")
+          .single();
+          
+        if (!customerError && customerData) {
+          customerId = customerData.id;
+        }
+      } catch (err) {
+        console.warn("Could not auto-create customer profile", err);
+      }
 
       // 2. Generate Job Number
       const jobNumber = `JOB-${Math.floor(1000 + Math.random() * 9000)}`;
 
       // 3. Create Job
-      const { data: jobData, error: jobError } = await supabase
+      const { data: jobData, error: jobError } = await (supabase as any)
         .from("jobs")
         .insert([{
           job_number: jobNumber,
