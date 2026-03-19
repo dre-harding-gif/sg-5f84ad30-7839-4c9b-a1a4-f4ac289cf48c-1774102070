@@ -70,8 +70,24 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    loadDashboardData();
+    checkAuth();
   }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      // Redirect to staff login if not authenticated
+      router.push("/staff-login");
+      return;
+    }
+    
+    setUser(session.user);
+    fetchUserRole(session.user.id);
+    fetchStats();
+    fetchRecentJobs();
+    fetchUpcomingJobs();
+  };
 
   async function loadDashboardData() {
     try {
