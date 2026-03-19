@@ -27,6 +27,7 @@ interface InventoryItem {
   supplier: string;
   notes: string;
   assigned_to?: string;
+  condition?: string;
 }
 
 export default function InventoryPage() {
@@ -64,6 +65,26 @@ export default function InventoryPage() {
     if (item.current_quantity === 0) return "critical";
     if (item.current_quantity <= item.reorder_level) return "low";
     return "good";
+  };
+
+  const getConditionBadge = (condition?: string) => {
+    if (!condition) condition = "good";
+    
+    const config = {
+      excellent: { label: "Excellent", className: "bg-green-100 text-green-800 border-green-300" },
+      good: { label: "Good", className: "bg-green-100 text-green-800 border-green-300" },
+      fair: { label: "Fair", className: "bg-yellow-100 text-yellow-800 border-yellow-300" },
+      poor: { label: "Poor", className: "bg-orange-100 text-orange-800 border-orange-300" },
+      needs_repair: { label: "Needs Repair", className: "bg-red-100 text-red-800 border-red-300" }
+    };
+
+    const { label, className } = config[condition as keyof typeof config] || config.good;
+    
+    return (
+      <Badge variant="outline" className={className}>
+        {label}
+      </Badge>
+    );
   };
 
   const filteredMaterials = materials.filter(item =>
@@ -301,6 +322,7 @@ export default function InventoryPage() {
                       <TableRow>
                         <TableHead>Tool / Equipment</TableHead>
                         <TableHead>Asset Location</TableHead>
+                        <TableHead>Condition Report</TableHead>
                         <TableHead>Current Location / Assigned</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
@@ -311,6 +333,7 @@ export default function InventoryPage() {
                         <TableRow key={tool.id}>
                           <TableCell className="font-medium">{tool.name}</TableCell>
                           <TableCell className="text-muted-foreground">{tool.location}</TableCell>
+                          <TableCell>{getConditionBadge(tool.condition)}</TableCell>
                           <TableCell>{tool.assigned_to || "In Stock"}</TableCell>
                           <TableCell>
                             {tool.assigned_to ? (
