@@ -1,37 +1,41 @@
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation } from "lucide-react";
+import { MapPin } from "lucide-react";
 
 interface MapLauncherProps {
   address: string;
-  variant?: "default" | "outline" | "ghost" | "secondary" | "link" | "destructive";
-  size?: "default" | "sm" | "lg" | "icon";
-  showIcon?: boolean;
-  className?: string;
+  size?: "sm" | "default" | "lg";
 }
 
-export function MapLauncher({ address, variant = "outline", size = "sm", showIcon = true, className = "" }: MapLauncherProps) {
-  const handleLaunch = () => {
-    // Detect iOS
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    
+export function MapLauncher({ address, size = "default" }: MapLauncherProps) {
+  const handleOpenMaps = () => {
+    // Encode address for URL
     const encodedAddress = encodeURIComponent(address);
     
+    // Detect device/browser
+    const userAgent = navigator.userAgent || navigator.vendor;
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+    const isAndroid = /android/i.test(userAgent);
+    
+    let mapsUrl: string;
+    
     if (isIOS) {
-      window.open(`maps://?q=${encodedAddress}`, '_blank');
+      // Open Apple Maps on iOS devices
+      mapsUrl = `maps://maps.apple.com/?q=${encodedAddress}`;
+    } else if (isAndroid) {
+      // Open Google Maps on Android devices
+      mapsUrl = `google.navigation:q=${encodedAddress}`;
     } else {
-      window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
+      // Open Google Maps in browser for desktop
+      mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
     }
+    
+    window.open(mapsUrl, '_blank');
   };
 
   return (
-    <Button 
-      variant={variant} 
-      size={size} 
-      onClick={handleLaunch} 
-      className={`gap-2 ${className}`}
-    >
-      {showIcon && <Navigation className="w-4 h-4" />}
-      Get Directions
+    <Button onClick={handleOpenMaps} variant="outline" size={size}>
+      <MapPin className="w-4 h-4 mr-2" />
+      Open in Maps
     </Button>
   );
 }

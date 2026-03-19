@@ -1,193 +1,185 @@
 import { useState, useEffect } from "react";
-import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Photo {
   id: string;
-  url: string;
+  photo_url: string;
   caption?: string;
-  uploadedBy?: string;
-  uploadedAt?: string;
+  photo_type?: string;
+  created_at?: string;
 }
 
 interface PhotoLightboxProps {
   photos: Photo[];
-  initialIndex?: number;
+  initialIndex: number;
   isOpen: boolean;
   onClose: () => void;
-  onDelete?: (photoId: string) => void;
   canDelete?: boolean;
+  onPhotoDeleted?: () => void;
 }
 
 export function PhotoLightbox({
   photos,
-  initialIndex = 0,
+  initialIndex,
   isOpen,
   onClose,
-  onDelete,
   canDelete = false,
+  onPhotoDeleted
 }: PhotoLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const { toast } = useToast();
 
-  // Sync state if initialIndex changes when reopened
   useEffect(() => {
-    if (isOpen) {
-      setCurrentIndex(initialIndex);
-    }
-  }, [isOpen, initialIndex]);
+    setCurrentIndex(initialIndex);
+  }, [initialIndex]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (!isOpen) return;
+      
       if (e.key === "ArrowLeft") {
-        setCurrentIndex((prev) => (prev > 0 ? prev - 1 : prev));
-      }
-      if (e.key === "ArrowRight") {
-        setCurrentIndex((prev) => (prev < photos.length - 1 ? prev + 1 : prev));
+        handlePrevious();
+      } else if (e.key === "ArrowRight") {
+        handleNext();
+      } else if (e.key === "Escape") {
+        onClose();
       }
     };
 
-    if (isOpen) {
-      document.addEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, currentIndex]);
+
+  const handlePrevious = () => {
+    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : photos.length - 1));
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev < photos.length - 1 ? prev + 1 : 0));
+  };
+
+  const handleDelete = async () => {
+    if (!canDelete || !photos[currentIndex]) return;
+
+    const photo = photos[currentIndex];
+    
+    try {
+      const { error } = await supabase
+        .from("job_photos")
+        .delete()
+        .eq("id", photo.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Photo Deleted",
+        description: "The photo has been removed from the job."
+      });
+
+      if (onPhotoDeleted) {
+        onPhotoDeleted();
+      }
+
+      if (photos.length === 1) {
+        onClose();
+      } else {
+        setCurrentIndex(currentIndex > 0 ? currentIndex - 1 : 0);
+      }
+    } catch (error: any) {
+      console.error("Delete photo error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete photo. Please try again.",
+        variant: "destructive"
+      });
     }
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "auto";
-    };
-  }, [isOpen, onClose, photos?.length]);
+  };
 
-  if (!isOpen || photos.length === 0) return null;
+  if (!photos || photos.length === 0) return null;
 
   const currentPhoto = photos[currentIndex];
-  const isFirst = currentIndex === 0;
-  const isLast = currentIndex === photos.length - 1;
-
-  const goToPrevious = () => {
-    if (!isFirst) setCurrentIndex(currentIndex - 1);
-  };
-
-  const goToNext = () => {
-    if (!isLast) setCurrentIndex(currentIndex + 1);
-  };
-
-  const handleDownload = async () => {
-    try {
-      const response = await fetch(currentPhoto.url);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `job-photo-${currentPhoto.id}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error("Error downloading photo:", error);
-    }
-  };
-
-  const handleDelete = () => {
-    if (onDelete && currentPhoto.id) {
-      if (confirm("Are you sure you want to delete this photo?")) {
-        onDelete(currentPhoto.id);
-        if (photos.length > 1) {
-          setCurrentIndex(isLast ? currentIndex - 1 : currentIndex);
-        } else {
-          onClose();
-        }
-      }
-    }
-  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center">
-      {/* Close Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-4 right-4 text-white hover:bg-white/10"
-        onClick={onClose}
-      >
-        <X className="w-6 h-6" />
-      </Button>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-7xl w-full h-[90vh] p-0 bg-black/95">
+        <div className="relative w-full h-full flex items-center justify-center">
+          {/* Close Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="absolute top-4 right-4 z-50 text-white hover:bg-white/20"
+          >
+            <X className="w-6 h-6" />
+          </Button>
 
-      {/* Navigation Buttons */}
-      {!isFirst && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/10"
-          onClick={goToPrevious}
-        >
-          <ChevronLeft className="w-8 h-8" />
-        </Button>
-      )}
-
-      {!isLast && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/10"
-          onClick={goToNext}
-        >
-          <ChevronRight className="w-8 h-8" />
-        </Button>
-      )}
-
-      {/* Main Image */}
-      <div className="max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center p-4">
-        <img
-          src={currentPhoto.url}
-          alt={currentPhoto.caption || `Photo ${currentIndex + 1}`}
-          className="max-w-full max-h-full object-contain"
-        />
-      </div>
-
-      {/* Bottom Bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm p-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex-1">
-            {currentPhoto.caption && (
-              <p className="text-white text-lg font-medium">{currentPhoto.caption}</p>
-            )}
-            {currentPhoto.uploadedBy && (
-              <p className="text-white/60 text-sm">
-                Uploaded by {currentPhoto.uploadedBy}
-                {currentPhoto.uploadedAt && ` • ${new Date(currentPhoto.uploadedAt).toLocaleDateString()}`}
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-white/60 text-sm mr-4">
-              {currentIndex + 1} / {photos.length}
-            </span>
-
+          {/* Delete Button */}
+          {canDelete && (
             <Button
               variant="ghost"
               size="icon"
-              className="text-white hover:bg-white/10"
-              onClick={handleDownload}
+              onClick={handleDelete}
+              className="absolute top-4 right-16 z-50 text-red-500 hover:bg-red-500/20"
             >
-              <Download className="w-5 h-5" />
+              <Trash2 className="w-6 h-6" />
             </Button>
+          )}
 
-            {canDelete && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-red-400 hover:bg-red-400/10"
-                onClick={handleDelete}
-              >
-                <Trash2 className="w-5 h-5" />
-              </Button>
-            )}
+          {/* Previous Button */}
+          {photos.length > 1 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handlePrevious}
+              className="absolute left-4 z-50 text-white hover:bg-white/20"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </Button>
+          )}
+
+          {/* Next Button */}
+          {photos.length > 1 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleNext}
+              className="absolute right-4 z-50 text-white hover:bg-white/20"
+            >
+              <ChevronRight className="w-8 h-8" />
+            </Button>
+          )}
+
+          {/* Image */}
+          <div className="w-full h-full flex items-center justify-center p-12">
+            <img
+              src={currentPhoto.photo_url}
+              alt={currentPhoto.caption || `Photo ${currentIndex + 1}`}
+              className="max-w-full max-h-full object-contain"
+            />
+          </div>
+
+          {/* Caption and Info */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6 text-white">
+            <div className="max-w-4xl mx-auto">
+              {currentPhoto.caption && (
+                <p className="text-lg mb-2">{currentPhoto.caption}</p>
+              )}
+              <div className="flex items-center justify-between text-sm text-white/70">
+                <span>
+                  {currentIndex + 1} / {photos.length}
+                </span>
+                {currentPhoto.photo_type && (
+                  <span className="capitalize">{currentPhoto.photo_type.replace('_', ' ')}</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
