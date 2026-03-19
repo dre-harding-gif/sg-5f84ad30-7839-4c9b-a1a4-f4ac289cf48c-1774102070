@@ -112,9 +112,9 @@ export default function InventoryPage() {
   async function handleConditionChange(toolId: string, newCondition: string) {
     try {
       const updateData: InventoryUpdate = { condition: newCondition };
-      const { error } = await (supabase
+      const { error } = await (supabase as any)
         .from("inventory_items")
-        .update(updateData) as any)
+        .update(updateData)
         .eq("id", toolId);
 
       if (error) throw error;
@@ -149,9 +149,9 @@ export default function InventoryPage() {
 
     try {
       const updateData: InventoryUpdate = { assigned_to: selectedTeamMember };
-      const { error } = await (supabase
+      const { error } = await (supabase as any)
         .from("inventory_items")
-        .update(updateData) as any)
+        .update(updateData)
         .eq("id", selectedTool.id);
 
       if (error) throw error;
@@ -193,9 +193,9 @@ export default function InventoryPage() {
         assigned_to: null,
         condition: returnCondition 
       };
-      const { error } = await (supabase
+      const { error } = await (supabase as any)
         .from("inventory_items")
-        .update(updateData) as any)
+        .update(updateData)
         .eq("id", selectedTool.id);
 
       if (error) throw error;
