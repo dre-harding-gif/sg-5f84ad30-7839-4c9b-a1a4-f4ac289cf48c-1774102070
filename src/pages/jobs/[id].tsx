@@ -82,7 +82,6 @@ export default function JobDetailPage() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxPhotos, setLightboxPhotos] = useState<any[]>([]);
-  const [purchaseOrdersList, setPurchaseOrdersList] = useState<any[]>([]);
   
   // Time Log States
   const [showTimeLogDialog, setShowTimeLogDialog] = useState(false);
@@ -216,7 +215,7 @@ export default function JobDetailPage() {
         .order("created_at", { ascending: false });
       
       if (error) throw error;
-      setPurchaseOrdersList(data || []);
+      setPurchaseOrders(data || []);
     } catch (error) {
       console.error("Error fetching purchase orders:", error);
     }
@@ -699,7 +698,7 @@ export default function JobDetailPage() {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  {purchaseOrdersList.length === 0 ? (
+                  {purchaseOrders.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Receipt className="w-10 h-10 mx-auto mb-3 opacity-50" />
                       <p className="text-sm">No P/O numbers generated yet</p>
@@ -707,7 +706,7 @@ export default function JobDetailPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {purchaseOrdersList.map((po) => (
+                      {purchaseOrders.map((po) => (
                         <div key={po.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
                           <div className="flex items-center gap-3">
                             <Receipt className="w-5 h-5 text-blue-600" />
