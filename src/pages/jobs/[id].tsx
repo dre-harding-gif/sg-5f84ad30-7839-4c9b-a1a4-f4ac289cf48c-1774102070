@@ -33,9 +33,9 @@ interface TimeLog {
   id: string;
   job_id: string;
   user_id: string;
-  date: string;
+  log_date: string;
   hours_worked: number;
-  description: string;
+  work_description: string;
   profiles: {
     full_name: string;
   };
@@ -45,8 +45,8 @@ interface JobDocument {
   id: string;
   job_id: string;
   document_type: string;
-  file_name: string;
-  file_url: string;
+  document_name: string;
+  document_url: string;
   uploaded_by: string;
   uploaded_at: string;
   profiles: {
@@ -58,7 +58,8 @@ interface CustomerCommunication {
   id: string;
   job_id: string;
   message: string;
-  sent_by: string;
+  sender_id: string;
+  sender_type: string;
   is_concern: boolean;
   concern_resolved: boolean;
   created_at: string;
@@ -85,9 +86,9 @@ export default function JobDetailPage() {
   // Time Log States
   const [showTimeLogDialog, setShowTimeLogDialog] = useState(false);
   const [newTimeLog, setNewTimeLog] = useState({
-    date: new Date().toISOString().split('T')[0],
+    log_date: new Date().toISOString().split('T')[0],
     hours_worked: 0,
-    description: ""
+    work_description: ""
   });
   
   // Document Upload States
@@ -156,45 +157,48 @@ export default function JobDetailPage() {
   }, [id]);
 
   async function fetchTimeLogs() {
+    if (!id) return;
     try {
       const { data, error } = await supabase
         .from("time_logs")
         .select("*, profiles!time_logs_user_id_fkey(full_name)")
-        .eq("job_id", id)
-        .order("date", { ascending: false });
+        .eq("job_id", id as string)
+        .order("log_date", { ascending: false });
       
       if (error) throw error;
-      setTimeLogs(data || []);
+      setTimeLogs((data as unknown as TimeLog[]) || []);
     } catch (error) {
       console.error("Error fetching time logs:", error);
     }
   }
 
   async function fetchDocuments() {
+    if (!id) return;
     try {
       const { data, error } = await supabase
         .from("job_documents")
         .select("*, profiles!job_documents_uploaded_by_fkey(full_name)")
-        .eq("job_id", id)
+        .eq("job_id", id as string)
         .order("uploaded_at", { ascending: false });
       
       if (error) throw error;
-      setDocuments(data || []);
+      setDocuments((data as unknown as JobDocument[]) || []);
     } catch (error) {
       console.error("Error fetching documents:", error);
     }
   }
 
   async function fetchCommunications() {
+    if (!id) return;
     try {
       const { data, error } = await supabase
         .from("customer_communications")
-        .select("*, profiles!customer_communications_sent_by_fkey(full_name)")
-        .eq("job_id", id)
+        .select("*, profiles!customer_communications_sender_id_fkey(full_name)")
+        .eq("job_id", id as string)
         .order("created_at", { ascending: false });
       
       if (error) throw error;
-      setCommunications(data || []);
+      setCommunications((data as unknown as CustomerCommunication[]) || []);
     } catch (error) {
       console.error("Error fetching communications:", error);
     }
@@ -214,11 +218,11 @@ export default function JobDetailPage() {
       const { error } = await supabase
         .from("time_logs")
         .insert({
-          job_id: id,
+          job_id: id as string,
           user_id: session.user.id,
-          date: newTimeLog.date,
+          log_date: newTimeLog.log_date,
           hours_worked: newTimeLog.hours_worked,
-          description: newTimeLog.description
+          work_description: newTimeLog.work_description
         });
 
       if (error) throw error;
@@ -229,7 +233,7 @@ export default function JobDetailPage() {
       });
 
       setShowTimeLogDialog(false);
-      setNewTimeLog({ date: new Date().toISOString().split('T')[0], hours_worked: 0, description: "" });
+      setNewTimeLog({ log_date: new Date().toISOString().split('T')[0], hours_worked: 0, work_description: "" });
       await fetchTimeLogs();
     } catch (error: any) {
       toast({
@@ -267,10 +271,10 @@ export default function JobDetailPage() {
       const { error: dbError } = await supabase
         .from("job_documents")
         .insert({
-          job_id: id,
+          job_id: id as string,
           document_type: documentType,
-          file_name: documentFile.name,
-          file_url: publicUrl,
+          document_name: documentFile.name,
+          document_url: publicUrl,
           uploaded_by: session.user.id
         });
 
@@ -293,15 +297,15 @@ export default function JobDetailPage() {
     }
   }
 
-  async function handleDeleteDocument(docId: string, fileUrl: string) {
+  async function handleDeleteDocument(docId: string, documentUrl: string) {
     try {
-      const fileName = fileUrl.split('/job-documents/')[1];
-      
-      const { error: storageError } = await supabase.storage
-        .from('job-documents')
-        .remove([fileName]);
-
-      if (storageError) throw storageError;
+      const fileNameMatch = documentUrl.match(/\/job-documents\/(.+)$/);
+      if (fileNameMatch && fileNameMatch[1]) {
+        const { error: storageError } = await supabase.storage
+          .from('job-documents')
+          .remove([fileNameMatch[1]]);
+        if (storageError) console.error("Storage deletion error:", storageError);
+      }
 
       const { error: dbError } = await supabase
         .from("job_documents")
@@ -389,10 +393,11 @@ export default function JobDetailPage() {
       const { error } = await supabase
         .from("customer_communications")
         .insert({
-          job_id: id,
+          job_id: id as string,
           customer_id: job.customer.id,
           message: notificationMessage,
-          sent_by: session.user.id,
+          sender_id: session.user.id,
+          sender_type: "staff",
           is_concern: isConcern,
           concern_resolved: false
         });
@@ -651,8 +656,8 @@ export default function JobDetailPage() {
                         <Label>Date</Label>
                         <Input 
                           type="date" 
-                          value={newTimeLog.date}
-                          onChange={(e) => setNewTimeLog({ ...newTimeLog, date: e.target.value })}
+                          value={newTimeLog.log_date}
+                          onChange={(e) => setNewTimeLog({ ...newTimeLog, log_date: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
@@ -670,8 +675,8 @@ export default function JobDetailPage() {
                         <Label>Description (Optional)</Label>
                         <Textarea 
                           placeholder="What work was completed?"
-                          value={newTimeLog.description}
-                          onChange={(e) => setNewTimeLog({ ...newTimeLog, description: e.target.value })}
+                          value={newTimeLog.work_description}
+                          onChange={(e) => setNewTimeLog({ ...newTimeLog, work_description: e.target.value })}
                         />
                       </div>
                     </div>
@@ -709,10 +714,10 @@ export default function JobDetailPage() {
                       <TableBody>
                         {timeLogs.map((log) => (
                           <TableRow key={log.id}>
-                            <TableCell>{new Date(log.date).toLocaleDateString()}</TableCell>
+                            <TableCell>{new Date(log.log_date).toLocaleDateString()}</TableCell>
                             <TableCell>{log.profiles?.full_name || "Unknown"}</TableCell>
                             <TableCell className="font-semibold">{log.hours_worked}h</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{log.description || "—"}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{log.work_description || "—"}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -884,20 +889,20 @@ export default function JobDetailPage() {
                               {doc.document_type.replace('_', ' ').toUpperCase()}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-medium">{doc.file_name}</TableCell>
+                          <TableCell className="font-medium">{doc.document_name}</TableCell>
                           <TableCell>{doc.profiles?.full_name || "Unknown"}</TableCell>
                           <TableCell>{new Date(doc.uploaded_at).toLocaleDateString()}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
                               <Button size="sm" variant="outline" asChild>
-                                <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                                <a href={doc.document_url} target="_blank" rel="noopener noreferrer">
                                   <Download className="w-4 h-4" />
                                 </a>
                               </Button>
                               <Button 
                                 size="sm" 
                                 variant="destructive" 
-                                onClick={() => handleDeleteDocument(doc.id, doc.file_url)}
+                                onClick={() => handleDeleteDocument(doc.id, doc.document_url)}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
