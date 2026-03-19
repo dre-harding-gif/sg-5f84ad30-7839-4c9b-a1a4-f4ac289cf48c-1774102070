@@ -1,18 +1,19 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { SEO } from "@/components/SEO";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Calendar, MapPin, Users, FileText, MessageSquare, 
   Download, LogOut, CheckCircle, Clock, AlertCircle,
-  Image as ImageIcon, Send
+  Image as ImageIcon, Send, Timer, Wrench
 } from "lucide-react";
 import { format } from "date-fns";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
@@ -31,8 +32,10 @@ interface CustomerJob {
   materials: any[];
   photos: any[];
   documents: any[];
-  messages: any[];
+  communications: any[];
   estimated_cost: number;
+  progress: number;
+  total_hours_worked: number;
 }
 
 export default function CustomerPortal() {
@@ -43,6 +46,7 @@ export default function CustomerPortal() {
   const [jobs, setJobs] = useState<CustomerJob[]>([]);
   const [selectedJob, setSelectedJob] = useState<CustomerJob | null>(null);
   const [newMessage, setNewMessage] = useState("");
+  const [isConcern, setIsConcern] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
@@ -59,14 +63,13 @@ export default function CustomerPortal() {
         return;
       }
 
-      // Load customer data
-      const customerResponse = await (supabase as any)
+      const { data: customerData, error: customerError } = await supabase
         .from("customers")
         .select("*")
         .eq("email", session.user.email)
         .single();
 
-      if (!customerResponse.data) {
+      if (customerError || !customerData) {
         toast({
           title: "Access Denied",
           description: "No customer account found",
@@ -77,8 +80,8 @@ export default function CustomerPortal() {
         return;
       }
 
-      setCustomer(customerResponse.data);
-      await loadCustomerJobs(customerResponse.data.id);
+      setCustomer(customerData);
+      await loadCustomerJobs(customerData.id);
     } catch (error: any) {
       console.error("Auth error:", error);
       toast({
@@ -93,37 +96,62 @@ export default function CustomerPortal() {
 
   const loadCustomerJobs = async (customerId: string) => {
     try {
-      // Force bypass type checking by casting immediately after await
-      const jobsResult = await (supabase as any)
+      const { data: jobsData, error: jobsError } = await supabase
         .from("jobs")
         .select("*")
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
 
-      if (jobsResult.error) throw jobsResult.error;
+      if (jobsError) throw jobsError;
 
-      const jobsData = jobsResult.data || [];
+      if (!jobsData || jobsData.length === 0) {
+        setJobs([]);
+        return;
+      }
 
-      if (jobsData.length > 0) {
-        const jobIds = jobsData.map((j: any) => j.id);
+      const jobIds = jobsData.map((j: any) => j.id);
 
-        // Load photos
-        const photosResult = await (supabase as any)
-          .from("job_photos")
-          .select("*")
-          .in("job_id", jobIds);
+      // Load photos
+      const { data: photosData } = await supabase
+        .from("job_photos")
+        .select("*")
+        .in("job_id", jobIds)
+        .order("created_at", { ascending: false });
+
+      // Load documents
+      const { data: documentsData } = await supabase
+        .from("job_documents")
+        .select("*")
+        .in("job_id", jobIds)
+        .order("uploaded_at", { ascending: false });
+
+      // Load communications
+      const { data: communicationsData } = await supabase
+        .from("customer_communications")
+        .select("*, profiles!customer_communications_sender_id_fkey(full_name)")
+        .in("job_id", jobIds)
+        .order("created_at", { ascending: false });
+
+      // Load time logs to calculate total hours
+      const { data: timeLogsData } = await supabase
+        .from("time_logs")
+        .select("job_id, hours_worked")
+        .in("job_id", jobIds);
+
+      // Load quotes
+      const { data: quotesData } = await supabase
+        .from("quotes")
+        .select("*")
+        .in("job_id", jobIds);
+
+      const formattedJobs = jobsData.map((job: any) => {
+        const jobPhotos = (photosData || []).filter((p: any) => p.job_id === job.id);
+        const jobDocs = (documentsData || []).filter((d: any) => d.job_id === job.id);
+        const jobComms = (communicationsData || []).filter((c: any) => c.job_id === job.id);
+        const jobTimeLogs = (timeLogsData || []).filter((t: any) => t.job_id === job.id);
+        const totalHours = jobTimeLogs.reduce((sum: number, log: any) => sum + (log.hours_worked || 0), 0);
         
-        const photosData = photosResult.data || [];
-
-        // Load quotes
-        const quotesResult = await (supabase as any)
-          .from("quotes")
-          .select("*")
-          .in("job_id", jobIds);
-        
-        const quotesData = quotesResult.data || [];
-
-        const formattedJobs = jobsData.map((job: any) => ({
+        return {
           id: job.id,
           job_number: job.job_number || `JOB-${job.id.slice(0, 8)}`,
           status: job.status,
@@ -133,16 +161,18 @@ export default function CustomerPortal() {
           address: job.address || "No address",
           team_members: job.assigned_team || [],
           materials: job.materials || [],
-          photos: photosData.filter((p: any) => p.job_id === job.id),
-          documents: [],
-          messages: [],
-          estimated_cost: quotesData.find((q: any) => q.job_id === job.id)?.total || job.estimated_cost || 0
-        }));
+          photos: jobPhotos,
+          documents: jobDocs,
+          communications: jobComms,
+          estimated_cost: quotesData?.find((q: any) => q.job_id === job.id)?.total || job.estimated_cost || 0,
+          progress: job.status === "completed" ? 100 : job.status === "in_progress" ? 50 : 10,
+          total_hours_worked: totalHours
+        };
+      });
 
-        setJobs(formattedJobs);
-        if (formattedJobs.length > 0 && !selectedJob) {
-          setSelectedJob(formattedJobs[0]);
-        }
+      setJobs(formattedJobs);
+      if (formattedJobs.length > 0 && !selectedJob) {
+        setSelectedJob(formattedJobs[0]);
       }
     } catch (error: any) {
       console.error("Load jobs error:", error);
@@ -158,18 +188,22 @@ export default function CustomerPortal() {
     if (!newMessage.trim() || !selectedJob || !customer) return;
 
     try {
-      const notificationResponse = await (supabase as any)
-        .from("notifications")
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
+
+      const { error } = await supabase
+        .from("customer_communications")
         .insert({
-          customer_id: customer.id,
           job_id: selectedJob.id,
-          type: "message",
+          customer_id: customer.id,
           message: newMessage,
-          status: "sent",
-          sent_at: new Date().toISOString()
+          sender_id: session.user.id,
+          sender_type: "customer",
+          is_concern: isConcern,
+          concern_resolved: false
         });
 
-      if (notificationResponse.error) throw notificationResponse.error;
+      if (error) throw error;
 
       toast({
         title: "Message Sent",
@@ -177,6 +211,8 @@ export default function CustomerPortal() {
       });
 
       setNewMessage("");
+      setIsConcern(false);
+      await loadCustomerJobs(customer.id);
     } catch (error: any) {
       console.error("Send message error:", error);
       toast({
@@ -196,7 +232,7 @@ export default function CustomerPortal() {
     switch (status) {
       case "completed":
         return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case "in progress":
+      case "in_progress":
         return <Clock className="w-4 h-4 text-blue-500" />;
       case "planning":
         return <AlertCircle className="w-4 h-4 text-amber-500" />;
@@ -209,7 +245,7 @@ export default function CustomerPortal() {
     switch (status) {
       case "completed":
         return "bg-green-100 text-green-800";
-      case "in progress":
+      case "in_progress":
         return "bg-blue-100 text-blue-800";
       case "planning":
         return "bg-amber-100 text-amber-800";
@@ -226,6 +262,8 @@ export default function CustomerPortal() {
       </div>
     );
   }
+
+  const unresolvedConcerns = selectedJob?.communications.filter((c: any) => c.is_concern && !c.concern_resolved) || [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -283,7 +321,7 @@ export default function CustomerPortal() {
                     <div className="flex items-start justify-between mb-2">
                       <span className="font-medium">{job.job_number}</span>
                       <Badge className={getStatusColor(job.status)}>
-                        {job.status}
+                        {job.status.replace('_', ' ').toUpperCase()}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground line-clamp-2">
@@ -292,6 +330,9 @@ export default function CustomerPortal() {
                     <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                       <Calendar className="w-3 h-3" />
                       {format(new Date(job.start_date), "dd MMM yyyy")}
+                    </div>
+                    <div className="mt-2">
+                      <Progress value={job.progress} className="h-1" />
                     </div>
                   </button>
                 ))}
@@ -311,9 +352,24 @@ export default function CustomerPortal() {
               <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="photos">Photos</TabsTrigger>
-                  <TabsTrigger value="documents">Documents</TabsTrigger>
-                  <TabsTrigger value="messages">Messages</TabsTrigger>
+                  <TabsTrigger value="photos">
+                    Photos
+                    {selectedJob.photos.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">{selectedJob.photos.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="documents">
+                    Documents
+                    {selectedJob.documents.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">{selectedJob.documents.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="messages">
+                    Messages
+                    {unresolvedConcerns.length > 0 && (
+                      <Badge variant="destructive" className="ml-2">{unresolvedConcerns.length}</Badge>
+                    )}
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-4">
@@ -329,12 +385,21 @@ export default function CustomerPortal() {
                         <div className="flex items-center gap-2">
                           {getStatusIcon(selectedJob.status)}
                           <Badge className={getStatusColor(selectedJob.status)}>
-                            {selectedJob.status}
+                            {selectedJob.status.replace('_', ' ').toUpperCase()}
                           </Badge>
                         </div>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      {/* Progress Bar */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium">Job Progress</span>
+                          <span className="text-sm font-medium">{selectedJob.progress}%</span>
+                        </div>
+                        <Progress value={selectedJob.progress} className="h-3" />
+                      </div>
+
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="flex items-start gap-3">
                           <Calendar className="w-5 h-5 text-muted-foreground mt-0.5" />
@@ -362,10 +427,10 @@ export default function CustomerPortal() {
                           <MapPin className="w-5 h-5 text-muted-foreground mt-0.5" />
                           <div className="flex-1">
                             <p className="font-medium">Location</p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm text-muted-foreground mb-2">
                               {selectedJob.address}
                             </p>
-                            <MapLauncher address={selectedJob.address} />
+                            <MapLauncher address={selectedJob.address} size="sm" />
                           </div>
                         </div>
 
@@ -373,9 +438,21 @@ export default function CustomerPortal() {
                           <div className="flex items-start gap-3">
                             <Users className="w-5 h-5 text-muted-foreground mt-0.5" />
                             <div>
-                              <p className="font-medium">Team</p>
+                              <p className="font-medium">Your Team</p>
                               <p className="text-sm text-muted-foreground">
                                 {selectedJob.team_members.join(", ")}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedJob.total_hours_worked > 0 && (
+                          <div className="flex items-start gap-3">
+                            <Timer className="w-5 h-5 text-muted-foreground mt-0.5" />
+                            <div>
+                              <p className="font-medium">Hours Worked</p>
+                              <p className="text-sm text-muted-foreground">
+                                {selectedJob.total_hours_worked} hours
                               </p>
                             </div>
                           </div>
@@ -403,7 +480,7 @@ export default function CustomerPortal() {
                       <CardContent>
                         <ul className="space-y-2">
                           {selectedJob.materials.map((material: any, index: number) => (
-                            <li key={index} className="flex items-center justify-between">
+                            <li key={index} className="flex items-center justify-between p-2 border rounded">
                               <span>{material.name}</span>
                               <span className="text-muted-foreground">
                                 Qty: {material.quantity}
@@ -420,6 +497,7 @@ export default function CustomerPortal() {
                   <Card>
                     <CardHeader>
                       <CardTitle>Job Photos ({selectedJob.photos.length})</CardTitle>
+                      <CardDescription>View progress photos from your project</CardDescription>
                     </CardHeader>
                     <CardContent>
                       {selectedJob.photos.length > 0 ? (
@@ -460,6 +538,9 @@ export default function CustomerPortal() {
                           <p className="text-muted-foreground">
                             No photos uploaded yet
                           </p>
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Photos will appear here as work progresses
+                          </p>
                         </div>
                       )}
                     </CardContent>
@@ -470,6 +551,7 @@ export default function CustomerPortal() {
                   <Card>
                     <CardHeader>
                       <CardTitle>Documents & Warranties</CardTitle>
+                      <CardDescription>Access plans, specifications, and warranty documents</CardDescription>
                     </CardHeader>
                     <CardContent>
                       {selectedJob.documents.length > 0 ? (
@@ -477,20 +559,27 @@ export default function CustomerPortal() {
                           {selectedJob.documents.map((doc: any) => (
                             <div
                               key={doc.id}
-                              className="flex items-center justify-between p-3 border rounded-lg"
+                              className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 flex-1">
                                 <FileText className="w-5 h-5 text-muted-foreground" />
                                 <div>
-                                  <p className="font-medium">{doc.name}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {doc.type}
-                                  </p>
+                                  <p className="font-medium">{doc.document_name}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline">
+                                      {doc.document_type.replace('_', ' ').toUpperCase()}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                      {format(new Date(doc.uploaded_at), "dd MMM yyyy")}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                              <Button variant="outline" size="sm">
-                                <Download className="w-4 h-4 mr-2" />
-                                Download
+                              <Button variant="outline" size="sm" asChild>
+                                <a href={doc.document_url} target="_blank" rel="noopener noreferrer" download>
+                                  <Download className="w-4 h-4 mr-2" />
+                                  Download
+                                </a>
                               </Button>
                             </div>
                           ))}
@@ -501,6 +590,9 @@ export default function CustomerPortal() {
                           <p className="text-muted-foreground">
                             No documents available yet
                           </p>
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Documents will appear here once uploaded
+                          </p>
                         </div>
                       )}
                     </CardContent>
@@ -510,23 +602,51 @@ export default function CustomerPortal() {
                 <TabsContent value="messages">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Messages & Updates</CardTitle>
+                      <CardTitle className="flex items-center gap-2">
+                        <MessageSquare className="w-5 h-5" />
+                        Messages & Updates
+                      </CardTitle>
+                      <CardDescription>Communicate with Harding Homes about your project</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      {unresolvedConcerns.length > 0 && (
+                        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertCircle className="w-5 h-5 text-destructive" />
+                            <span className="font-semibold text-destructive">
+                              Your Concerns ({unresolvedConcerns.length})
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            The team is working to address your concerns. Updates will appear below.
+                          </p>
+                        </div>
+                      )}
+
                       <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {selectedJob.messages.length > 0 ? (
-                          selectedJob.messages.map((msg: any) => (
+                        {selectedJob.communications.length > 0 ? (
+                          selectedJob.communications.map((msg: any) => (
                             <div
                               key={msg.id}
                               className={`p-3 rounded-lg ${
-                                msg.sender === "customer"
+                                msg.sender_type === "customer"
                                   ? "bg-primary/10 ml-8"
                                   : "bg-muted mr-8"
-                              }`}
+                              } ${msg.is_concern && !msg.concern_resolved ? 'border-l-4 border-l-destructive' : ''}`}
                             >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-medium">
+                                  {msg.sender_type === "customer" ? "You" : msg.profiles?.full_name || "Harding Homes"}
+                                </span>
+                                {msg.is_concern && (
+                                  <Badge variant={msg.concern_resolved ? "outline" : "destructive"} className="text-xs">
+                                    {msg.concern_resolved ? "Resolved" : "Concern"}
+                                  </Badge>
+                                )}
+                              </div>
                               <p className="text-sm">{msg.message}</p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                {format(new Date(msg.sent_at), "dd MMM yyyy HH:mm")}
+                                {format(new Date(msg.created_at), "dd MMM yyyy HH:mm")}
                               </p>
                             </div>
                           ))
@@ -540,7 +660,7 @@ export default function CustomerPortal() {
                         )}
                       </div>
 
-                      <div className="space-y-2 pt-4 border-t">
+                      <div className="space-y-3 pt-4 border-t">
                         <Label>Send a message to Harding Homes</Label>
                         <Textarea
                           placeholder="Type your message or question here..."
@@ -548,9 +668,24 @@ export default function CustomerPortal() {
                           onChange={(e) => setNewMessage(e.target.value)}
                           rows={3}
                         />
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id="is-concern"
+                              checked={isConcern}
+                              onChange={(e) => setIsConcern(e.target.checked)}
+                              className="w-4 h-4"
+                            />
+                            <Label htmlFor="is-concern" className="text-sm font-normal">
+                              This is a concern that needs attention
+                            </Label>
+                          </div>
+                        </div>
                         <Button 
                           onClick={handleSendMessage}
                           disabled={!newMessage.trim()}
+                          className="w-full sm:w-auto"
                         >
                           <Send className="w-4 h-4 mr-2" />
                           Send Message
