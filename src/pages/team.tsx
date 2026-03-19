@@ -231,11 +231,14 @@ export default function TeamPage() {
 
     setDeleting(true);
     try {
-      // Delete from auth.users (this will cascade to profiles due to FK)
-      const { error: authError } = await supabase.auth.admin.deleteUser(memberToDelete.id);
+      // Delete from profiles table - the ON DELETE CASCADE foreign key will handle auth.users
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", memberToDelete.id);
       
-      if (authError) {
-        throw authError;
+      if (error) {
+        throw error;
       }
 
       toast({
