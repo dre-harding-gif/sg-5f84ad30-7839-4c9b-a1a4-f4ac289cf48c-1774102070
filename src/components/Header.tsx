@@ -1,7 +1,7 @@
-import { Bell, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
+import { NotificationDropdown } from "@/components/NotificationDropdown";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -32,12 +32,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         </div>
         
         <div className="ml-auto flex items-center gap-2 sm:gap-4">
-          <Button variant="ghost" size="icon" className="relative text-white hover:bg-white/10">
-            <Bell className="h-5 w-5" />
-            <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white border-0 text-xs">
-              3
-            </Badge>
-          </Button>
+          <NotificationDropdown />
         </div>
       </div>
     </header>

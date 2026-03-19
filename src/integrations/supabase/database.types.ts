@@ -675,63 +675,47 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string | null
-          customer_id: string | null
           id: string
-          job_id: string | null
+          link: string | null
           message: string
-          recipient: string
-          sent_at: string | null
-          status: string | null
-          subject: string | null
-          trigger_event: string
+          profile_id: string
+          read: boolean | null
+          title: string
           type: string
         }
         Insert: {
           created_at?: string | null
-          customer_id?: string | null
           id?: string
-          job_id?: string | null
+          link?: string | null
           message: string
-          recipient: string
-          sent_at?: string | null
-          status?: string | null
-          subject?: string | null
-          trigger_event: string
+          profile_id: string
+          read?: boolean | null
+          title: string
           type: string
         }
         Update: {
           created_at?: string | null
-          customer_id?: string | null
           id?: string
-          job_id?: string | null
+          link?: string | null
           message?: string
-          recipient?: string
-          sent_at?: string | null
-          status?: string | null
-          subject?: string | null
-          trigger_event?: string
+          profile_id?: string
+          read?: boolean | null
+          title?: string
           type?: string
         }
         Relationships: [
           {
-            foreignKeyName: "notifications_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: "notifications_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "notifications_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: "notifications_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "user_permissions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "notifications_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -1109,6 +1093,10 @@ export type Database = {
     }
     Functions: {
       generate_po_number: { Args: never; Returns: string }
+      get_unread_notification_count: {
+        Args: { user_uuid: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
