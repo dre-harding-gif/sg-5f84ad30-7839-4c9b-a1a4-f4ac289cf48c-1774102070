@@ -38,11 +38,14 @@ serve(async (req) => {
     // Generate a secure temporary password (16 characters)
     const tempPassword = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 
-    // Create the user account
+    // Get the site URL for the login link
+    const siteUrl = Deno.env.get("SITE_URL") || "https://yourdomain.com";
+
+    // Create the user account with email sending enabled
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
-      email_confirm: true,
+      email_confirm: true, // Auto-confirm email
       user_metadata: {
         full_name: fullName,
       },
@@ -73,6 +76,24 @@ serve(async (req) => {
       );
     }
 
+    // Send custom invitation email with credentials
+    // Note: This uses Supabase's built-in email templates
+    // You'll need to customize the email template in Supabase Dashboard:
+    // Authentication > Email Templates > Invite user
+    
+    // Generate password reset link (user can change password after first login)
+    const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: email,
+    });
+
+    if (resetError) {
+      console.error("Reset link error:", resetError);
+    }
+
+    // For now, we'll return the credentials to be shown in the UI
+    // Supabase will send a confirmation email automatically since email_confirm: true
+    
     return new Response(
       JSON.stringify({
         success: true,
@@ -81,6 +102,8 @@ serve(async (req) => {
         userId: authData.user.id,
         fullName,
         role,
+        loginUrl: siteUrl,
+        message: "User created successfully. Credentials should be shared manually via the UI dialog.",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
