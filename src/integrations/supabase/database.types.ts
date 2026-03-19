@@ -108,6 +108,81 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_communications: {
+        Row: {
+          concern_resolved: boolean | null
+          created_at: string | null
+          customer_id: string
+          id: string
+          is_concern: boolean | null
+          job_id: string
+          message: string
+          resolved_at: string | null
+          sender_id: string | null
+          sender_type: string
+        }
+        Insert: {
+          concern_resolved?: boolean | null
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          is_concern?: boolean | null
+          job_id: string
+          message: string
+          resolved_at?: string | null
+          sender_id?: string | null
+          sender_type: string
+        }
+        Update: {
+          concern_resolved?: boolean | null
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          is_concern?: boolean | null
+          job_id?: string
+          message?: string
+          resolved_at?: string | null
+          sender_id?: string | null
+          sender_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_communications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_communications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_communications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_communications_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_communications_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_portal_access: {
         Row: {
           access_code: string
@@ -550,6 +625,61 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_documents: {
+        Row: {
+          document_name: string
+          document_type: string
+          document_url: string
+          id: string
+          job_id: string
+          notes: string | null
+          uploaded_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          document_name: string
+          document_type: string
+          document_url: string
+          id?: string
+          job_id: string
+          notes?: string | null
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          document_name?: string
+          document_type?: string
+          document_url?: string
+          id?: string
+          job_id?: string
+          notes?: string | null
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_documents_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "user_permissions"
             referencedColumns: ["id"]
           },
         ]
