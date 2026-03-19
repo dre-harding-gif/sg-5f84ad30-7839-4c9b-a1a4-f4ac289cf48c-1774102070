@@ -64,7 +64,7 @@ export function NotificationDropdown() {
         .order("created_at", { ascending: false })
         .limit(10);
 
-      const notifs = (data || []) as Notification[];
+      const notifs = (data || []) as unknown as Notification[];
       setNotifications(notifs);
       setUnreadCount(notifs.filter(n => !n.read).length);
     } catch (error) {
