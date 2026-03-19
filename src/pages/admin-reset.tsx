@@ -65,7 +65,7 @@ export default function AdminResetPage() {
   }
 
   return (
-    <PermissionGate requiredPermission="manage_team">
+    <PermissionGate require="manage_team">
       <DashboardLayout>
         <div className="p-6 max-w-2xl mx-auto">
           <Card>
