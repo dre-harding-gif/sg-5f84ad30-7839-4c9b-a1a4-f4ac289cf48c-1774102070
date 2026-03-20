@@ -743,7 +743,7 @@ export type Database = {
           assigned_team: string[] | null
           completed_at: string | null
           created_at: string | null
-          customer_id: string
+          customer_id: string | null
           description: string | null
           end_date: string | null
           estimated_hours: number | null
@@ -768,7 +768,7 @@ export type Database = {
           assigned_team?: string[] | null
           completed_at?: string | null
           created_at?: string | null
-          customer_id: string
+          customer_id?: string | null
           description?: string | null
           end_date?: string | null
           estimated_hours?: number | null
@@ -793,7 +793,7 @@ export type Database = {
           assigned_team?: string[] | null
           completed_at?: string | null
           created_at?: string | null
-          customer_id?: string
+          customer_id?: string | null
           description?: string | null
           end_date?: string | null
           estimated_hours?: number | null

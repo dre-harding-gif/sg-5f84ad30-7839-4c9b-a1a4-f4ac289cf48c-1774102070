@@ -140,40 +140,15 @@ export default function JobsPage() {
     e.preventDefault();
     
     try {
-      // 1. Get or create customer profile
-      let customerId = null;
-      
-      try {
-        const newCustomerId = crypto.randomUUID();
-        const { data: customerData, error: customerError } = await supabase
-          .from("profiles")
-          .insert([{
-            id: newCustomerId,
-            full_name: formData.customer_name,
-            role: "customer"
-          }])
-          .select("id")
-          .single();
-          
-        if (!customerError && customerData) {
-          customerId = customerData.id;
-        } else {
-          // If inserting profile fails (e.g., due to FK constraints with auth.users), we just proceed without a customer link
-          console.warn("Could not auto-create customer profile", customerError);
-        }
-      } catch (err) {
-        console.warn("Could not auto-create customer profile", err);
-      }
-
-      // 2. Generate Job Number
+      // 1. Generate Job Number
       const jobNumber = `JOB-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      // 3. Create Job
+      // 2. Create Job (customer_id is now optional)
       const { data: jobData, error: jobError } = await supabase
         .from("jobs")
         .insert([{
           job_number: jobNumber,
-          customer_id: customerId,
+          customer_id: null, // Will be set when customer logs in/signs up
           title: formData.title,
           address: formData.address,
           postcode: formData.postcode,
@@ -181,7 +156,8 @@ export default function JobsPage() {
           end_date: formData.end_date || null,
           description: formData.description,
           priority: formData.priority,
-          status: 'scheduled'
+          status: 'scheduled',
+          notes: `Customer: ${formData.customer_name}` // Store customer name in notes for now
         }])
         .select()
         .single();
@@ -208,9 +184,11 @@ export default function JobsPage() {
     } catch (error: any) {
       console.error("Job creation error:", error);
       
+      const errorMessage = error.message || "Failed to create job. Please try again.";
+      
       toast({
         title: "Error Creating Job",
-        description: error.message || "Failed to create job. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
