@@ -9,7 +9,6 @@ const corsHeaders = {
 serve(async (req) => {
   console.log("=== INVITE USER FUNCTION START ===");
   console.log("Request method:", req.method);
-  console.log("Request URL:", req.url);
 
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -38,13 +37,12 @@ serve(async (req) => {
 
     console.log("✅ All required fields present");
 
-    // Initialize Supabase client with service role key
+    // Initialize Supabase Admin client
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     console.log("Supabase URL:", supabaseUrl);
     console.log("Service key exists:", !!supabaseServiceKey);
-    console.log("Service key length:", supabaseServiceKey?.length || 0);
 
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error("❌ Missing Supabase credentials");
@@ -57,38 +55,75 @@ serve(async (req) => {
       );
     }
 
-    console.log("✅ Supabase credentials present, creating client...");
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    console.log("✅ Supabase credentials present, creating admin client...");
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
-    console.log("✅ Supabase client created");
+    console.log("✅ Supabase admin client created");
 
-    // Check if user already exists
-    console.log("Checking for existing user with email:", email);
-    const { data: existingUser, error: checkError } = await supabase
-      .from("profiles")
-      .select("id, email, full_name")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (checkError) {
-      console.error("❌ Error checking for existing user:", checkError);
+    // Check if user already exists in auth.users
+    console.log("Checking for existing auth user with email:", email);
+    const { data: existingAuthUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (listError) {
+      console.error("❌ Error listing users:", listError);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: "Database error while checking for existing user",
-          details: checkError
+          error: "Failed to check existing users",
+          details: listError
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
-    console.log("Existing user check result:", existingUser);
+    const existingAuthUser = existingAuthUsers.users.find(u => u.email === email);
+    console.log("Existing auth user check result:", existingAuthUser ? "Found" : "Not found");
 
-    if (existingUser && !resend) {
+    // Generate temporary password
+    const tempPassword = `Temp${Math.random().toString(36).substring(2, 10)}!`;
+    console.log("Generated password length:", tempPassword.length);
+
+    if (existingAuthUser && resend) {
+      console.log("This is a resend request for existing user:", existingAuthUser.id);
+      
+      // Update the user's password
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        existingAuthUser.id,
+        { password: tempPassword }
+      );
+
+      if (updateError) {
+        console.error("❌ Error updating user password:", updateError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: "Failed to reset password",
+            details: updateError
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+
+      console.log("✅ Password reset for existing user");
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          userId: existingAuthUser.id,
+          email: email,
+          tempPassword: tempPassword,
+          emailSent: false,
+          message: "Password reset. Share new credentials with team member.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    if (existingAuthUser && !resend) {
       console.log("❌ User already exists (not a resend request)");
       return new Response(
         JSON.stringify({ 
@@ -99,36 +134,38 @@ serve(async (req) => {
       );
     }
 
-    // Generate UUID and temporary password
-    const userId = existingUser?.id || crypto.randomUUID();
-    const tempPassword = `Temp${Math.random().toString(36).substring(2, 10)}!`;
-    
-    console.log("Generated userId:", userId);
-    console.log("Generated password length:", tempPassword.length);
+    // Create new auth user
+    console.log("Creating new auth user with email:", email);
+    const { data: newAuthUser, error: createAuthError } = await supabaseAdmin.auth.admin.createUser({
+      email: email,
+      password: tempPassword,
+      email_confirm: true, // Auto-confirm email
+      user_metadata: {
+        full_name: fullName,
+        role: role
+      }
+    });
 
-    if (existingUser && resend) {
-      console.log("This is a resend request for existing user:", userId);
-      console.log("✅ Password regenerated for resend");
-      
+    if (createAuthError) {
+      console.error("❌ Error creating auth user:", createAuthError);
       return new Response(
-        JSON.stringify({
-          success: true,
-          userId: userId,
-          email: email,
-          tempPassword: tempPassword,
-          emailSent: false,
-          message: "Password reset. Share new credentials with team member.",
+        JSON.stringify({ 
+          success: false, 
+          error: "Failed to create user account",
+          details: createAuthError
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
-    // Create profile directly in profiles table
-    console.log("Creating new profile with data:", { id: userId, email, full_name: fullName, role });
-    const { data: newProfile, error: profileError } = await supabase
+    console.log("✅ Auth user created successfully:", newAuthUser.user.id);
+
+    // Create profile with the auth user's ID
+    console.log("Creating profile with data:", { id: newAuthUser.user.id, email, full_name: fullName, role });
+    const { data: newProfile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .insert({
-        id: userId,
+        id: newAuthUser.user.id,
         email: email,
         full_name: fullName,
         role: role,
@@ -138,7 +175,9 @@ serve(async (req) => {
 
     if (profileError) {
       console.error("❌ Error creating profile:", profileError);
-      console.error("Profile error details:", JSON.stringify(profileError, null, 2));
+      // If profile creation fails, delete the auth user to keep things consistent
+      await supabaseAdmin.auth.admin.deleteUser(newAuthUser.user.id);
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -156,11 +195,11 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        userId: userId,
+        userId: newAuthUser.user.id,
         email: email,
         tempPassword: tempPassword,
         emailSent: false,
-        message: "Team member created successfully. Auth is disabled - credentials are for reference only.",
+        message: "Team member created successfully. Share credentials with them to log in.",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );

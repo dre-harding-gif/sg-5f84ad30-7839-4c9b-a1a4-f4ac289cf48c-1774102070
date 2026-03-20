@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
+ 
 export type Json =
   | string
   | number
@@ -105,6 +105,39 @@ export type Database = {
           status?: string | null
           updated_at?: string | null
           year?: number
+        }
+        Relationships: []
+      }
+      company_settings: {
+        Row: {
+          company_email: string
+          company_name: string
+          created_at: string | null
+          email_notifications_enabled: boolean | null
+          id: string
+          notification_email: string | null
+          resend_api_key_configured: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_email: string
+          company_name?: string
+          created_at?: string | null
+          email_notifications_enabled?: boolean | null
+          id?: string
+          notification_email?: string | null
+          resend_api_key_configured?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_email?: string
+          company_name?: string
+          created_at?: string | null
+          email_notifications_enabled?: boolean | null
+          id?: string
+          notification_email?: string | null
+          resend_api_key_configured?: boolean | null
+          updated_at?: string | null
         }
         Relationships: []
       }
