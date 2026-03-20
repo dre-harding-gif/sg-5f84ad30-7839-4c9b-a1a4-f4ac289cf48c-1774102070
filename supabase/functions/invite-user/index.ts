@@ -10,8 +10,6 @@ interface InviteRequest {
   email: string;
   fullName: string;
   role: string;
-  password?: string;
-  resend?: boolean;
 }
 
 serve(async (req) => {
@@ -21,14 +19,17 @@ serve(async (req) => {
   }
 
   try {
+    console.log("=== INVITE USER FUNCTION START ===");
+    
     // Parse request body
-    const { email, fullName, role, resend = false }: InviteRequest = await req.json();
+    const body = await req.json();
+    const { email, fullName, role } = body as InviteRequest;
 
-    console.log("Team member request:", { email, fullName, role, resend });
+    console.log("Request data:", { email, fullName, role });
 
     // Validate required fields
     if (!email || !fullName || !role) {
-      console.error("Missing required fields:", { email: !!email, fullName: !!fullName, role: !!role });
+      console.error("Missing required fields");
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -41,6 +42,11 @@ serve(async (req) => {
     // Get Supabase environment variables
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    console.log("Environment check:", { 
+      hasUrl: !!supabaseUrl, 
+      hasKey: !!supabaseServiceKey 
+    });
 
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error("Missing Supabase environment variables");
@@ -61,29 +67,31 @@ serve(async (req) => {
       },
     });
 
-    // Generate temporary password (for reference, even if auth is disabled)
-    const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
+    console.log("Supabase admin client created");
 
-    // Since auth is disabled, we'll just create a profile directly
-    // Generate a UUID for the profile
+    // Generate a UUID for the new profile
     const newUserId = crypto.randomUUID();
-
-    if (resend) {
-      console.log("Resend not applicable - auth is disabled");
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Resend functionality requires authentication to be enabled" 
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-      );
-    }
+    console.log("Generated UUID:", newUserId);
 
     // Check if profile already exists with this email
-    const { data: existingProfiles } = await supabaseAdmin
+    console.log("Checking for existing profile...");
+    const { data: existingProfiles, error: checkError } = await supabaseAdmin
       .from("profiles")
       .select("id, email")
       .eq("email", email);
+
+    if (checkError) {
+      console.error("Error checking existing profiles:", checkError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Database error: ${checkError.message}` 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
+    console.log("Existing profiles check result:", existingProfiles);
 
     if (existingProfiles && existingProfiles.length > 0) {
       console.error("Team member already exists:", email);
@@ -96,7 +104,12 @@ serve(async (req) => {
       );
     }
 
+    // Generate temporary password
+    const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
+    console.log("Generated temp password (hidden)");
+
     // Create profile directly (no auth.users entry needed since auth is disabled)
+    console.log("Creating profile...");
     const { data: newProfile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .insert([{
@@ -110,35 +123,47 @@ serve(async (req) => {
 
     if (profileError) {
       console.error("Error creating profile:", profileError);
-      throw new Error(`Failed to create team member: ${profileError.message}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Failed to create team member: ${profileError.message}`,
+          details: profileError
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
     }
 
-    console.log("Team member created successfully:", newUserId);
+    console.log("Profile created successfully:", newUserId);
 
     // Return success response
     const response = {
       success: true,
       userId: newUserId,
-      email,
-      tempPassword: tempPassword, // Return password for reference (even though auth is disabled)
-      emailSent: false, // Email not sent since auth/SMTP is disabled
+      email: email,
+      tempPassword: tempPassword,
+      emailSent: false,
       message: "Team member created successfully. Auth is disabled - credentials are for reference only.",
     };
 
-    console.log("Success response:", { ...response, tempPassword: "[REDACTED]" });
+    console.log("=== SUCCESS - Returning response ===");
 
     return new Response(
       JSON.stringify(response),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
 
   } catch (error: any) {
-    console.error("Unexpected error in invite-user function:", error);
+    console.error("=== UNEXPECTED ERROR ===");
+    console.error("Error:", error);
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
         error: error.message || "An unexpected error occurred",
         details: error.toString(),
+        stack: error.stack
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
