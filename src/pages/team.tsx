@@ -129,6 +129,12 @@ export default function TeamPage() {
     setInviting(true);
     
     try {
+      console.log("Calling invite-user function with:", {
+        email: inviteForm.email,
+        fullName: inviteForm.fullName,
+        role: inviteForm.role
+      });
+
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: {
           email: inviteForm.email,
@@ -138,7 +144,12 @@ export default function TeamPage() {
         }
       });
 
-      if (error) throw error;
+      console.log("Edge Function response:", { data, error });
+
+      if (error) {
+        console.error("Edge Function error details:", error);
+        throw error;
+      }
 
       if (data.success && data.tempPassword) {
         setInvitedCredentials({
@@ -164,12 +175,14 @@ export default function TeamPage() {
             : "Share credentials manually (SMTP not configured)"
         });
       } else {
+        console.error("Edge Function returned unsuccessful response:", data);
         throw new Error(data.error || "Failed to create user account");
       }
     } catch (error: any) {
+      console.error("Full error object:", error);
       toast({
         title: "Invitation Failed",
-        description: error.message || "Failed to create user account",
+        description: error.message || "Failed to create user account. Check browser console for details.",
         variant: "destructive"
       });
     } finally {
