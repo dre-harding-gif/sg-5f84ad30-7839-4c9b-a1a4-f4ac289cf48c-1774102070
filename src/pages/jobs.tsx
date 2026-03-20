@@ -144,9 +144,11 @@ export default function JobsPage() {
       let customerId = null;
       
       try {
+        const newCustomerId = crypto.randomUUID();
         const { data: customerData, error: customerError } = await supabase
           .from("profiles")
           .insert([{
+            id: newCustomerId,
             full_name: formData.customer_name,
             role: "customer"
           }])
@@ -155,6 +157,9 @@ export default function JobsPage() {
           
         if (!customerError && customerData) {
           customerId = customerData.id;
+        } else {
+          // If inserting profile fails (e.g., due to FK constraints with auth.users), we just proceed without a customer link
+          console.warn("Could not auto-create customer profile", customerError);
         }
       } catch (err) {
         console.warn("Could not auto-create customer profile", err);
