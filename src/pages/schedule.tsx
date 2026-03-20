@@ -29,7 +29,7 @@ interface ScheduleJob {
 export default function SchedulePage() {
   const { toast } = useToast();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"week" | "month">("month");
+  const [viewMode, setViewMode] = useState<"week" | "month" | "year">("month");
   const [userRole, setUserRole] = useState<string>("");
   const [scheduleJobs, setScheduleJobs] = useState<ScheduleJob[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -75,10 +75,15 @@ export default function SchedulePage() {
         const weekDates = getWeekDates();
         startDate = weekDates[0];
         endDate = weekDates[6];
-      } else {
+      } else if (viewMode === "month") {
         const monthDates = getMonthDates();
         startDate = monthDates[0];
         endDate = monthDates[monthDates.length - 1];
+      } else {
+        // Year view - load entire year
+        const year = currentDate.getFullYear();
+        startDate = new Date(year, 0, 1);
+        endDate = new Date(year, 11, 31);
       }
 
       const { data: jobsData } = await supabase
@@ -147,6 +152,44 @@ export default function SchedulePage() {
     return dates;
   };
 
+  const getYearMonths = () => {
+    const year = currentDate.getFullYear();
+    const months = [];
+    for (let i = 0; i < 12; i++) {
+      months.push({
+        month: i,
+        year: year,
+        name: monthNames[i],
+        dates: getMonthDatesForMonth(year, i)
+      });
+    }
+    return months;
+  };
+
+  const getMonthDatesForMonth = (year: number, month: number) => {
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    const dates = [];
+    const startPadding = (firstDay.getDay() + 6) % 7;
+    
+    for (let i = startPadding - 1; i >= 0; i--) {
+      const date = new Date(year, month, -i);
+      dates.push(date);
+    }
+    
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      dates.push(new Date(year, month, i));
+    }
+    
+    const endPadding = (7 - (dates.length % 7)) % 7;
+    for (let i = 1; i <= endPadding; i++) {
+      dates.push(new Date(year, month + 1, i));
+    }
+    
+    return dates;
+  };
+
   const getJobsForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
     return scheduleJobs.filter(job => job.date === dateStr);
@@ -156,8 +199,10 @@ export default function SchedulePage() {
     const newDate = new Date(currentDate);
     if (viewMode === "week") {
       newDate.setDate(newDate.getDate() - 7);
-    } else {
+    } else if (viewMode === "month") {
       newDate.setMonth(newDate.getMonth() - 1);
+    } else {
+      newDate.setFullYear(newDate.getFullYear() - 1);
     }
     setCurrentDate(newDate);
   };
@@ -166,8 +211,10 @@ export default function SchedulePage() {
     const newDate = new Date(currentDate);
     if (viewMode === "week") {
       newDate.setDate(newDate.getDate() + 7);
-    } else {
+    } else if (viewMode === "month") {
       newDate.setMonth(newDate.getMonth() + 1);
+    } else {
+      newDate.setFullYear(newDate.getFullYear() + 1);
     }
     setCurrentDate(newDate);
   };
@@ -238,6 +285,15 @@ export default function SchedulePage() {
                   >
                     <Calendar className="h-4 w-4 mr-1" />
                     Month
+                  </Button>
+                  <Button
+                    variant={viewMode === "year" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("year")}
+                    className={viewMode === "year" ? "bg-orange-500 hover:bg-orange-600" : ""}
+                  >
+                    <Calendar className="h-4 w-4 mr-1" />
+                    Year
                   </Button>
                 </div>
               )}
@@ -315,12 +371,19 @@ export default function SchedulePage() {
                       </h2>
                       <p className="text-sm text-muted-foreground mt-1">Week View</p>
                     </>
-                  ) : (
+                  ) : viewMode === "month" ? (
                     <>
                       <h2 className="text-xl font-bold">
                         {currentMonth} {currentYear}
                       </h2>
                       <p className="text-sm text-muted-foreground mt-1">Month View</p>
+                    </>
+                  ) : (
+                    <>
+                      <h2 className="text-xl font-bold">
+                        {currentYear}
+                      </h2>
+                      <p className="text-sm text-muted-foreground mt-1">Year View</p>
                     </>
                   )}
                 </div>
@@ -440,6 +503,87 @@ export default function SchedulePage() {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Year View */}
+              {viewMode === "year" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {getYearMonths().map((monthData, monthIndex) => {
+                    const monthJobs = scheduleJobs.filter(job => {
+                      const jobDate = new Date(job.date);
+                      return jobDate.getMonth() === monthData.month && jobDate.getFullYear() === monthData.year;
+                    });
+                    
+                    return (
+                      <Card key={monthIndex} className="overflow-hidden">
+                        <CardHeader className="pb-3 bg-muted/50">
+                          <CardTitle className="text-base font-semibold flex items-center justify-between">
+                            <span>{monthData.name}</span>
+                            {monthJobs.length > 0 && (
+                              <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                                {monthJobs.length} {monthJobs.length === 1 ? 'job' : 'jobs'}
+                              </Badge>
+                            )}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3">
+                          {/* Mini calendar header */}
+                          <div className="grid grid-cols-7 gap-1 mb-2">
+                            {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
+                              <div key={i} className="text-center text-xs font-medium text-muted-foreground">
+                                {day}
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Mini calendar grid */}
+                          <div className="grid grid-cols-7 gap-1">
+                            {monthData.dates.map((date, dateIndex) => {
+                              const dateJobs = getJobsForDate(date);
+                              const isCurrentMonthDate = date.getMonth() === monthData.month;
+                              const today = isToday(date);
+                              
+                              return (
+                                <div
+                                  key={dateIndex}
+                                  className={`
+                                    aspect-square flex items-center justify-center text-xs rounded
+                                    ${today ? 'bg-orange-500 text-white font-bold' : ''}
+                                    ${!today && dateJobs.length > 0 ? 'bg-blue-500 text-white font-semibold' : ''}
+                                    ${!today && dateJobs.length === 0 && isCurrentMonthDate ? 'hover:bg-muted' : ''}
+                                    ${!isCurrentMonthDate ? 'text-muted-foreground/40' : ''}
+                                    cursor-pointer transition-colors
+                                  `}
+                                  title={dateJobs.length > 0 ? `${dateJobs.length} job(s) on ${date.toLocaleDateString()}` : ''}
+                                >
+                                  {date.getDate()}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          
+                          {/* Month summary */}
+                          {monthJobs.length > 0 && (
+                            <div className="mt-3 pt-3 border-t space-y-1">
+                              {monthJobs.slice(0, 2).map(job => (
+                                <Link key={job.id} href={`/jobs/${job.id}`}>
+                                  <div className="text-xs p-1.5 bg-muted hover:bg-muted/80 rounded cursor-pointer truncate">
+                                    <div className="font-medium truncate">{job.title}</div>
+                                  </div>
+                                </Link>
+                              ))}
+                              {monthJobs.length > 2 && (
+                                <div className="text-xs text-muted-foreground text-center">
+                                  +{monthJobs.length - 2} more jobs
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </>
           )}
 
@@ -450,9 +594,15 @@ export default function SchedulePage() {
             </CardHeader>
             <CardContent className="flex gap-4 flex-wrap">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-orange-100 border-2 border-orange-500"></div>
+                <div className="w-4 h-4 rounded bg-orange-500"></div>
                 <span className="text-sm">Today</span>
               </div>
+              {viewMode === "year" && (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-blue-500"></div>
+                  <span className="text-sm">Has scheduled jobs</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Badge className="bg-orange-100 text-orange-800">In Progress</Badge>
                 <span className="text-sm">Active job</span>
