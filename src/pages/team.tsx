@@ -28,8 +28,18 @@ interface TeamMember {
   status: string;
 }
 
+interface SubContractor {
+  id: string;
+  name: string;
+  role: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+}
+
 export default function TeamPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [subContractors, setSubContractors] = useState<SubContractor[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole>("builder");
   const { toast } = useToast();
@@ -63,6 +73,7 @@ export default function TeamPage() {
   useEffect(() => {
     fetchTeamMembers();
     fetchUserRole();
+    fetchSubContractors();
   }, []);
 
   async function fetchUserRole() {
@@ -83,6 +94,17 @@ export default function TeamPage() {
       })) as TeamMember[]);
     }
     setLoading(false);
+  }
+
+  async function fetchSubContractors() {
+    const { data, error } = await supabase
+      .from("sub_contractors")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (data) {
+      setSubContractors(data);
+    }
   }
 
   async function handleRoleChange(userId: string, newRole: UserRole) {
@@ -293,6 +315,133 @@ Login at: ${window.location.origin}
     return role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
+  // Sub-contractor management
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [newSubRow, setNewSubRow] = useState(false);
+  const [subFormData, setSubFormData] = useState({
+    name: "",
+    role: "",
+    phone: "",
+    email: "",
+    notes: ""
+  });
+
+  function handleAddSubRow() {
+    setNewSubRow(true);
+    setSubFormData({ name: "", role: "", phone: "", email: "", notes: "" });
+  }
+
+  async function handleSaveNewSub() {
+    if (!subFormData.name || !subFormData.role) {
+      toast({
+        title: "Missing Information",
+        description: "Name and Role are required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("sub_contractors")
+      .insert([subFormData])
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add sub-contractor",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSubContractors([...subContractors, data]);
+    setNewSubRow(false);
+    setSubFormData({ name: "", role: "", phone: "", email: "", notes: "" });
+    toast({
+      title: "✅ Sub-Contractor Added",
+      description: `${data.name} has been added to your list`
+    });
+  }
+
+  function handleCancelNewSub() {
+    setNewSubRow(false);
+    setSubFormData({ name: "", role: "", phone: "", email: "", notes: "" });
+  }
+
+  function handleEditSub(sub: SubContractor) {
+    setEditingSubId(sub.id);
+    setSubFormData({
+      name: sub.name,
+      role: sub.role,
+      phone: sub.phone || "",
+      email: sub.email || "",
+      notes: sub.notes || ""
+    });
+  }
+
+  async function handleUpdateSub(subId: string) {
+    if (!subFormData.name || !subFormData.role) {
+      toast({
+        title: "Missing Information",
+        description: "Name and Role are required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const { error } = await supabase
+      .from("sub_contractors")
+      .update(subFormData)
+      .eq("id", subId);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update sub-contractor",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSubContractors(subContractors.map(sub => 
+      sub.id === subId ? { ...sub, ...subFormData } : sub
+    ));
+    setEditingSubId(null);
+    toast({
+      title: "✅ Updated",
+      description: "Sub-contractor details updated"
+    });
+  }
+
+  function handleCancelEdit() {
+    setEditingSubId(null);
+    setSubFormData({ name: "", role: "", phone: "", email: "", notes: "" });
+  }
+
+  async function handleDeleteSub(subId: string) {
+    const { error } = await supabase
+      .from("sub_contractors")
+      .delete()
+      .eq("id", subId);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete sub-contractor",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSubContractors(subContractors.filter(sub => sub.id !== subId));
+    toast({
+      title: "✅ Deleted",
+      description: "Sub-contractor removed"
+    });
+  }
+
   return (
     <PermissionGate require="view_team">
       <DashboardLayout>
@@ -472,6 +621,227 @@ Login at: ${window.location.origin}
                       </TableCell>
                     </TableRow>
                   ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Sub-Contractors Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Sub-Contractors</CardTitle>
+                  <CardDescription>Manage external contractors and specialists</CardDescription>
+                </div>
+                <Button
+                  onClick={handleAddSubRow}
+                  disabled={newSubRow}
+                  size="sm"
+                  className="bg-blue-500 hover:bg-blue-600"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Sub-Contractor
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Role/Trade</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {/* New Row for Adding */}
+                  {newSubRow && (
+                    <TableRow className="bg-blue-50">
+                      <TableCell>
+                        <Input
+                          placeholder="Name *"
+                          value={subFormData.name}
+                          onChange={(e) => setSubFormData({ ...subFormData, name: e.target.value })}
+                          className="h-8"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          placeholder="Role/Trade *"
+                          value={subFormData.role}
+                          onChange={(e) => setSubFormData({ ...subFormData, role: e.target.value })}
+                          className="h-8"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          placeholder="Phone"
+                          value={subFormData.phone}
+                          onChange={(e) => setSubFormData({ ...subFormData, phone: e.target.value })}
+                          className="h-8"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          placeholder="Email"
+                          type="email"
+                          value={subFormData.email}
+                          onChange={(e) => setSubFormData({ ...subFormData, email: e.target.value })}
+                          className="h-8"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          placeholder="Notes"
+                          value={subFormData.notes}
+                          onChange={(e) => setSubFormData({ ...subFormData, notes: e.target.value })}
+                          className="h-8"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-1 justify-end">
+                          <Button
+                            size="sm"
+                            onClick={handleSaveNewSub}
+                            className="h-8 bg-green-500 hover:bg-green-600"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelNewSub}
+                            className="h-8"
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+
+                  {/* Existing Sub-Contractors */}
+                  {subContractors.map((sub) => (
+                    <TableRow key={sub.id}>
+                      {editingSubId === sub.id ? (
+                        // Edit Mode
+                        <>
+                          <TableCell>
+                            <Input
+                              value={subFormData.name}
+                              onChange={(e) => setSubFormData({ ...subFormData, name: e.target.value })}
+                              className="h-8"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={subFormData.role}
+                              onChange={(e) => setSubFormData({ ...subFormData, role: e.target.value })}
+                              className="h-8"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={subFormData.phone}
+                              onChange={(e) => setSubFormData({ ...subFormData, phone: e.target.value })}
+                              className="h-8"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={subFormData.email}
+                              onChange={(e) => setSubFormData({ ...subFormData, email: e.target.value })}
+                              className="h-8"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={subFormData.notes}
+                              onChange={(e) => setSubFormData({ ...subFormData, notes: e.target.value })}
+                              className="h-8"
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex gap-1 justify-end">
+                              <Button
+                                size="sm"
+                                onClick={() => handleUpdateSub(sub.id)}
+                                className="h-8 bg-green-500 hover:bg-green-600"
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleCancelEdit}
+                                className="h-8"
+                              >
+                                ✕
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </>
+                      ) : (
+                        // View Mode
+                        <>
+                          <TableCell className="font-medium">{sub.name}</TableCell>
+                          <TableCell>{sub.role}</TableCell>
+                          <TableCell>
+                            {sub.phone && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Phone className="w-4 h-4 text-muted-foreground" />
+                                <span>{sub.phone}</span>
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {sub.email && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Mail className="w-4 h-4 text-muted-foreground" />
+                                <span>{sub.email}</span>
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {sub.notes}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex gap-1 justify-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditSub(sub)}
+                                className="h-8"
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteSub(sub.id)}
+                                className="h-8 text-red-600 border-red-500 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </>
+                      )}
+                    </TableRow>
+                  ))}
+
+                  {/* Empty State */}
+                  {subContractors.length === 0 && !newSubRow && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No sub-contractors added yet. Click the "+ Add Sub-Contractor" button to get started.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
