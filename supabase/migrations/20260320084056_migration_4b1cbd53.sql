@@ -1,0 +1,34 @@
+-- Disable RLS on all main tables for development access
+-- This allows you to use the software without authentication
+
+-- Core business tables
+ALTER TABLE leads DISABLE ROW LEVEL SECURITY;
+ALTER TABLE jobs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_orders DISABLE ROW LEVEL SECURITY;
+ALTER TABLE quotes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices DISABLE ROW LEVEL SECURITY;
+
+-- Job-related tables
+ALTER TABLE time_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE job_photos DISABLE ROW LEVEL SECURITY;
+ALTER TABLE job_documents DISABLE ROW LEVEL SECURITY;
+
+-- Company management tables
+ALTER TABLE company_fleet DISABLE ROW LEVEL SECURITY;
+ALTER TABLE fleet_issues DISABLE ROW LEVEL SECURITY;
+ALTER TABLE fleet_service_bookings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE insurance_policies DISABLE ROW LEVEL SECURITY;
+ALTER TABLE company_bills DISABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE pricing_guide DISABLE ROW LEVEL SECURITY;
+
+-- Portal and communication tables
+ALTER TABLE customer_portal_access DISABLE ROW LEVEL SECURITY;
+ALTER TABLE customer_communications DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public_enquiries DISABLE ROW LEVEL SECURITY;
+
+-- Task and notification tables
+ALTER TABLE daily_tasks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;

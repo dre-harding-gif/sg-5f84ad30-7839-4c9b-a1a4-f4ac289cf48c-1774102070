@@ -31,7 +31,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { PermissionGate } from "@/components/PermissionGate";
 import { useToast } from "@/hooks/use-toast";
 import { emailNotificationService } from "@/services/emailNotificationService";
-import { useRouter } from "next/navigation";
 
 export interface Job {
   id: string;
@@ -66,7 +65,6 @@ export default function JobsPage() {
   const [portalDialogOpen, setPortalDialogOpen] = useState(false);
   const [portalCredentials, setPortalCredentials] = useState({ email: "", password: "", portalUrl: "" });
   const [showPortalPassword, setShowPortalPassword] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     fetchJobs();
@@ -142,24 +140,11 @@ export default function JobsPage() {
     e.preventDefault();
     
     try {
-      // 1. Check authentication first
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please log in again to create jobs",
-          variant: "destructive",
-        });
-        router.push("/portal/login");
-        return;
-      }
-
-      // 2. Get or create customer profile
+      // 1. Get or create customer profile
       let customerId = null;
       
       try {
-        const { data: customerData, error: customerError } = await (supabase as any)
+        const { data: customerData, error: customerError } = await supabase
           .from("profiles")
           .insert([{
             full_name: formData.customer_name,
@@ -175,11 +160,11 @@ export default function JobsPage() {
         console.warn("Could not auto-create customer profile", err);
       }
 
-      // 3. Generate Job Number
+      // 2. Generate Job Number
       const jobNumber = `JOB-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      // 4. Create Job
-      const { data: jobData, error: jobError } = await (supabase as any)
+      // 3. Create Job
+      const { data: jobData, error: jobError } = await supabase
         .from("jobs")
         .insert([{
           job_number: jobNumber,
@@ -218,16 +203,9 @@ export default function JobsPage() {
     } catch (error: any) {
       console.error("Job creation error:", error);
       
-      let errorMessage = error.message;
-      
-      // Handle specific RLS errors
-      if (error.message?.includes("row level security") || error.message?.includes("policy")) {
-        errorMessage = "Permission denied. Please contact your administrator to check your account permissions.";
-      }
-      
       toast({
         title: "Error Creating Job",
-        description: errorMessage,
+        description: error.message || "Failed to create job. Please try again.",
         variant: "destructive",
       });
     }

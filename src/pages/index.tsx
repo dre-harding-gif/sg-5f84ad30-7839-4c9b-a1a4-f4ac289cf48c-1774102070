@@ -70,20 +70,8 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    checkAuthAndLoad();
+    loadDashboardData();
   }, []);
-
-  const checkAuthAndLoad = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      // Redirect to staff login if not authenticated
-      router.push("/staff-login");
-      return;
-    }
-    
-    await loadDashboardData();
-  };
 
   async function loadDashboardData() {
     try {
