@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,35 +22,16 @@ export default function AdminResetPage() {
     setLoading(true);
 
     try {
-      console.log("🔄 Looking up user by email...");
-      console.log("📧 Email:", email);
-      
-      // First, get the user ID from email using Supabase client
-      const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
-      
-      if (listError) {
-        console.error("❌ Failed to list users:", listError);
-        throw new Error(`Failed to lookup user: ${listError.message}`);
-      }
+      console.log("🔐 Sending reset request for:", email);
 
-      const user = users?.find(u => u.email === email);
-      
-      if (!user) {
-        console.error("❌ User not found:", email);
-        throw new Error(`No user found with email: ${email}`);
-      }
-
-      console.log("✅ User found:", user.id);
-      console.log("🔐 Resetting password via API route...");
-
-      // Call our Next.js API route to reset the password
+      // Call our Next.js API route to handle the secure lookup and reset
       const response = await fetch('/api/reset-user-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: user.id,
+          email,
           newPassword
         }),
       });
