@@ -7,96 +7,117 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    console.log("=== Invite User Function Started ===");
+    
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Missing environment variables");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body = await req.json();
-    console.log("Received request body:", body);
-
-    const { email, fullName, role, phone, resend } = body;
-
-    if (!email || !fullName || !role) {
-      console.error("Missing required fields:", { email, fullName, role });
+    // Parse request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log("Request body:", JSON.stringify(requestBody, null, 2));
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
       return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: "Email, full name, and role are required" 
-        }),
+        JSON.stringify({ error: "Invalid JSON in request body" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
+    const { email, full_name, role, phone } = requestBody;
+
+    // Validate required fields
+    if (!email || !full_name || !role) {
+      console.error("Missing required fields:", { email: !!email, full_name: !!full_name, role: !!role });
+      return new Response(
+        JSON.stringify({ error: "Email, full name, and role are required" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
+    console.log("Processing invite for:", email);
+
     // Check if user already exists
-    const { data: existingProfile } = await supabase
+    const { data: existingProfile, error: profileCheckError } = await supabase
       .from("profiles")
       .select("id, email")
       .eq("email", email)
       .maybeSingle();
 
+    if (profileCheckError) {
+      console.error("Profile check error:", profileCheckError);
+      return new Response(
+        JSON.stringify({ error: "Database error checking existing user" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
     let userId: string;
-    let tempPassword = "";
-    let emailSent = false;
+    let isNewUser = false;
+    let temporaryPassword = "";
 
     if (existingProfile) {
-      // User exists - send password reset
+      console.log("User exists, updating profile:", existingProfile.id);
       userId = existingProfile.id;
-      console.log("User exists, sending password reset:", email);
       
       // Update profile with new details
-      await supabase
+      const { error: updateError } = await supabase
         .from("profiles")
         .update({
-          full_name: fullName,
+          full_name,
           role,
           phone: phone || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", userId);
 
-      // Try to send password reset email
-      try {
-        const { error: resetError } = await supabase.auth.admin.inviteUserByEmail(email);
-        
-        if (resetError) {
-          console.error("Password reset error:", resetError);
-          // SMTP might not be configured - generate temp password
-          tempPassword = generatePassword();
-          
-          // Update the user's password directly
-          const { error: updateError } = await supabase.auth.admin.updateUserById(
-            userId,
-            { password: tempPassword }
-          );
-          
-          if (updateError) {
-            console.error("Failed to update password:", updateError);
-          }
-        } else {
-          emailSent = true;
-          console.log("Password reset email sent successfully");
-        }
-      } catch (err) {
-        console.error("Error sending reset email:", err);
-        tempPassword = generatePassword();
+      if (updateError) {
+        console.error("Profile update error:", updateError);
+        return new Response(
+          JSON.stringify({ error: "Failed to update user profile" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
       }
 
-    } else {
-      // Create new user
-      console.log("Creating new user:", email);
-      tempPassword = generatePassword();
+      // Send password reset email (will use SMTP if configured)
+      const { error: resetError } = await supabase.auth.admin.inviteUserByEmail(email);
+      
+      if (resetError) {
+        console.error("Password reset error:", resetError);
+        // Don't fail the whole operation if email fails
+      }
 
+      console.log("Updated existing user:", email);
+    } else {
+      console.log("Creating new user:", email);
+      isNewUser = true;
+      temporaryPassword = generatePassword();
+
+      // Create new auth user
       const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
         email,
-        password: tempPassword,
+        password: temporaryPassword,
         email_confirm: true,
         user_metadata: {
-          full_name: fullName,
+          full_name,
           role,
         },
       });
@@ -105,7 +126,6 @@ serve(async (req) => {
         console.error("Auth user creation error:", authError);
         return new Response(
           JSON.stringify({ 
-            success: false,
             error: "Failed to create user account", 
             details: authError.message 
           }),
@@ -113,13 +133,22 @@ serve(async (req) => {
         );
       }
 
-      userId = authUser.user!.id;
+      if (!authUser.user) {
+        console.error("No user returned from createUser");
+        return new Response(
+          JSON.stringify({ error: "Failed to create user account" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+
+      userId = authUser.user.id;
+      console.log("Auth user created:", userId);
 
       // Create profile
       const { error: profileError } = await supabase.from("profiles").insert({
         id: userId,
         email,
-        full_name: fullName,
+        full_name,
         role,
         phone: phone || null,
         created_at: new Date().toISOString(),
@@ -132,7 +161,6 @@ serve(async (req) => {
         await supabase.auth.admin.deleteUser(userId);
         return new Response(
           JSON.stringify({ 
-            success: false,
             error: "Failed to create user profile", 
             details: profileError.message 
           }),
@@ -140,33 +168,40 @@ serve(async (req) => {
         );
       }
 
-      console.log("User created successfully:", userId);
+      console.log("Profile created for:", email);
     }
 
     // Prepare success response
-    const response = {
+    const response: any = {
       success: true,
       userId,
       email,
-      tempPassword: emailSent ? null : tempPassword,
-      emailSent,
-      message: emailSent 
-        ? "Invitation email sent successfully!" 
-        : "User created. Share the temporary password manually (SMTP not configured)."
+      isNewUser,
     };
 
-    console.log("Returning response:", { ...response, tempPassword: response.tempPassword ? "[REDACTED]" : null });
+    if (isNewUser) {
+      response.temporaryPassword = temporaryPassword;
+      response.message = "User created successfully! Share the temporary password with them.";
+      response.emailSent = false; // We're returning the password, not sending email
+    } else {
+      response.message = "User updated and password reset email sent (if SMTP configured).";
+      response.emailSent = true; // Attempted to send email
+    }
 
+    console.log("=== Invite User Function Completed Successfully ===");
+    
     return new Response(
       JSON.stringify(response),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
 
   } catch (error) {
-    console.error("Unexpected error:", error);
+    console.error("=== Unexpected Error ===");
+    console.error("Error:", error);
+    console.error("Stack:", error instanceof Error ? error.stack : "No stack trace");
+    
     return new Response(
       JSON.stringify({ 
-        success: false,
         error: "Internal server error", 
         details: error instanceof Error ? error.message : "Unknown error" 
       }),
