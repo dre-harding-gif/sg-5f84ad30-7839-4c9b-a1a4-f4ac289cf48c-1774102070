@@ -129,60 +129,53 @@ export default function TeamPage() {
     setInviting(true);
     
     try {
-      console.log("Calling invite-user function with:", {
-        email: inviteForm.email,
-        fullName: inviteForm.fullName,
-        role: inviteForm.role
-      });
-
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: {
           email: inviteForm.email,
-          fullName: inviteForm.fullName,
-          role: inviteForm.role,
-          resend: false
+          full_name: inviteForm.fullName,
+          role: inviteForm.role
         }
       });
 
-      console.log("Edge Function response:", { data, error });
-
       if (error) {
-        console.error("Edge Function error details:", error);
+        console.error("Edge Function error:", error);
         throw error;
       }
 
-      if (data.success && data.tempPassword) {
+      if (!data.success) {
+        throw new Error(data.error || "Failed to send invitation");
+      }
+
+      // Show success based on whether it's a new user and if email was sent
+      if (data.isNewUser) {
         setInvitedCredentials({
           email: inviteForm.email,
-          password: data.tempPassword,
+          password: data.temporaryPassword || "",
           emailSent: data.emailSent || false
         });
         setSuccessDialogOpen(true);
-        setInviteDialogOpen(false);
-        
-        setInviteForm({
-          email: "",
-          fullName: "",
-          role: "builder"
-        });
-        
-        fetchTeamMembers();
-        
-        toast({
-          title: data.emailSent ? "✅ Invitation Sent!" : "✅ User Created",
-          description: data.emailSent 
-            ? "Email sent with login instructions" 
-            : "Share credentials manually (SMTP not configured)"
-        });
       } else {
-        console.error("Edge Function returned unsuccessful response:", data);
-        throw new Error(data.error || "Failed to create user account");
+        // Existing user - password reset sent
+        toast({
+          title: data.emailSent ? "✅ Password Reset Sent!" : "✅ User Updated",
+          description: data.message
+        });
       }
+
+      setInviteDialogOpen(false);
+      setInviteForm({
+        email: "",
+        fullName: "",
+        role: "builder"
+      });
+      
+      fetchTeamMembers();
+
     } catch (error: any) {
-      console.error("Full error object:", error);
+      console.error("Invitation error:", error);
       toast({
         title: "Invitation Failed",
-        description: error.message || "Failed to create user account. Check browser console for details.",
+        description: error.message || "Failed to send invitation. Check console for details.",
         variant: "destructive"
       });
     } finally {
@@ -197,10 +190,9 @@ export default function TeamPage() {
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: {
           email: member.email,
-          fullName: member.full_name,
-          role: member.role,
-          resend: true,
-        },
+          full_name: member.full_name,
+          role: member.role
+        }
       });
 
       if (error) {
@@ -213,9 +205,6 @@ export default function TeamPage() {
         return;
       }
 
-      // Log the full response for debugging
-      console.log('Invite response:', data);
-
       if (!data.success) {
         toast({
           title: "Error",
@@ -225,26 +214,31 @@ export default function TeamPage() {
         return;
       }
 
-      // Show success message with email status
+      // Show success message based on response
       if (data.emailSent) {
         toast({
-          title: "Invitation Sent!",
-          description: `✅ Password reset email sent to ${member.email}`,
+          title: "✅ Password Reset Sent!",
+          description: `Email sent to ${member.email}`,
         });
-      } else {
+      } else if (data.temporaryPassword) {
         // Show temporary password if email wasn't sent
         toast({
-          title: "Invitation Ready",
+          title: "⚠️ SMTP Not Configured",
           description: (
             <div className="space-y-2">
-              <p>⚠️ Email not configured. Share these credentials:</p>
+              <p>Share these credentials manually:</p>
               <p className="font-mono text-xs bg-black/10 p-2 rounded">
                 Email: {member.email}<br/>
-                Password: {data.tempPassword}
+                Password: {data.temporaryPassword}
               </p>
             </div>
           ),
           duration: 10000,
+        });
+      } else {
+        toast({
+          title: "✅ Invitation Ready",
+          description: data.message,
         });
       }
 
