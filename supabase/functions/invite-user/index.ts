@@ -7,216 +7,183 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log("=== INVITE USER FUNCTION START ===");
-  console.log("Request method:", req.method);
-
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    console.log("Handling CORS preflight");
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // Get request body
-    const body = await req.json();
-    console.log("Request body received:", JSON.stringify(body, null, 2));
-    
-    const { email, fullName, role, resend } = body;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Validate inputs
+    const body = await req.json();
+    console.log("Received request body:", body);
+
+    const { email, fullName, role, phone, resend } = body;
+
     if (!email || !fullName || !role) {
-      console.error("❌ Missing required fields:", { email: !!email, fullName: !!fullName, role: !!role });
+      console.error("Missing required fields:", { email, fullName, role });
       return new Response(
         JSON.stringify({ 
-          success: false, 
-          error: "Missing required fields: email, fullName, and role are required" 
+          success: false,
+          error: "Email, full name, and role are required" 
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    console.log("✅ All required fields present");
+    // Check if user already exists
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("id, email")
+      .eq("email", email)
+      .maybeSingle();
 
-    // Initialize Supabase Admin client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
-    console.log("Supabase URL:", supabaseUrl);
-    console.log("Service key exists:", !!supabaseServiceKey);
+    let userId: string;
+    let tempPassword = "";
+    let emailSent = false;
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("❌ Missing Supabase credentials");
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Server configuration error: Missing Supabase credentials" 
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-      );
-    }
-
-    console.log("✅ Supabase credentials present, creating admin client...");
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-    console.log("✅ Supabase admin client created");
-
-    // Check if user already exists in auth.users
-    console.log("Checking for existing auth user with email:", email);
-    const { data: existingAuthUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (listError) {
-      console.error("❌ Error listing users:", listError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Failed to check existing users",
-          details: listError
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-      );
-    }
-
-    const existingAuthUser = existingAuthUsers.users.find(u => u.email === email);
-    console.log("Existing auth user check result:", existingAuthUser ? "Found" : "Not found");
-
-    // Generate temporary password
-    const tempPassword = `Temp${Math.random().toString(36).substring(2, 10)}!`;
-    console.log("Generated password length:", tempPassword.length);
-
-    if (existingAuthUser && resend) {
-      console.log("This is a resend request for existing user:", existingAuthUser.id);
+    if (existingProfile) {
+      // User exists - send password reset
+      userId = existingProfile.id;
+      console.log("User exists, sending password reset:", email);
       
-      // Update the user's password
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-        existingAuthUser.id,
-        { password: tempPassword }
-      );
+      // Update profile with new details
+      await supabase
+        .from("profiles")
+        .update({
+          full_name: fullName,
+          role,
+          phone: phone || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
 
-      if (updateError) {
-        console.error("❌ Error updating user password:", updateError);
+      // Try to send password reset email
+      try {
+        const { error: resetError } = await supabase.auth.admin.inviteUserByEmail(email);
+        
+        if (resetError) {
+          console.error("Password reset error:", resetError);
+          // SMTP might not be configured - generate temp password
+          tempPassword = generatePassword();
+          
+          // Update the user's password directly
+          const { error: updateError } = await supabase.auth.admin.updateUserById(
+            userId,
+            { password: tempPassword }
+          );
+          
+          if (updateError) {
+            console.error("Failed to update password:", updateError);
+          }
+        } else {
+          emailSent = true;
+          console.log("Password reset email sent successfully");
+        }
+      } catch (err) {
+        console.error("Error sending reset email:", err);
+        tempPassword = generatePassword();
+      }
+
+    } else {
+      // Create new user
+      console.log("Creating new user:", email);
+      tempPassword = generatePassword();
+
+      const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: fullName,
+          role,
+        },
+      });
+
+      if (authError) {
+        console.error("Auth user creation error:", authError);
         return new Response(
           JSON.stringify({ 
-            success: false, 
-            error: "Failed to reset password",
-            details: updateError
+            success: false,
+            error: "Failed to create user account", 
+            details: authError.message 
           }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
         );
       }
 
-      console.log("✅ Password reset for existing user");
-      
-      return new Response(
-        JSON.stringify({
-          success: true,
-          userId: existingAuthUser.id,
-          email: email,
-          tempPassword: tempPassword,
-          emailSent: false,
-          message: "Password reset. Share new credentials with team member.",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-      );
-    }
+      userId = authUser.user!.id;
 
-    if (existingAuthUser && !resend) {
-      console.log("❌ User already exists (not a resend request)");
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Team member with this email already exists" 
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 409 }
-      );
-    }
-
-    // Create new auth user
-    console.log("Creating new auth user with email:", email);
-    const { data: newAuthUser, error: createAuthError } = await supabaseAdmin.auth.admin.createUser({
-      email: email,
-      password: tempPassword,
-      email_confirm: true, // Auto-confirm email
-      user_metadata: {
+      // Create profile
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: userId,
+        email,
         full_name: fullName,
-        role: role
+        role,
+        phone: phone || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      if (profileError) {
+        console.error("Profile creation error:", profileError);
+        // Rollback: delete auth user
+        await supabase.auth.admin.deleteUser(userId);
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: "Failed to create user profile", 
+            details: profileError.message 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
       }
-    });
 
-    if (createAuthError) {
-      console.error("❌ Error creating auth user:", createAuthError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Failed to create user account",
-          details: createAuthError
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-      );
+      console.log("User created successfully:", userId);
     }
 
-    console.log("✅ Auth user created successfully:", newAuthUser.user.id);
+    // Prepare success response
+    const response = {
+      success: true,
+      userId,
+      email,
+      tempPassword: emailSent ? null : tempPassword,
+      emailSent,
+      message: emailSent 
+        ? "Invitation email sent successfully!" 
+        : "User created. Share the temporary password manually (SMTP not configured)."
+    };
 
-    // Create profile with the auth user's ID
-    console.log("Creating profile with data:", { id: newAuthUser.user.id, email, full_name: fullName, role });
-    const { data: newProfile, error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .insert({
-        id: newAuthUser.user.id,
-        email: email,
-        full_name: fullName,
-        role: role,
-      })
-      .select()
-      .single();
+    console.log("Returning response:", { ...response, tempPassword: response.tempPassword ? "[REDACTED]" : null });
 
-    if (profileError) {
-      console.error("❌ Error creating profile:", profileError);
-      // If profile creation fails, delete the auth user to keep things consistent
-      await supabaseAdmin.auth.admin.deleteUser(newAuthUser.user.id);
-      
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Failed to create team member profile",
-          details: profileError
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-      );
-    }
-
-    console.log("✅ Profile created successfully:", newProfile);
-    console.log("=== INVITE USER FUNCTION SUCCESS ===");
-
-    // Return success response
     return new Response(
-      JSON.stringify({
-        success: true,
-        userId: newAuthUser.user.id,
-        email: email,
-        tempPassword: tempPassword,
-        emailSent: false,
-        message: "Team member created successfully. Share credentials with them to log in.",
-      }),
+      JSON.stringify(response),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
 
   } catch (error) {
-    console.error("=== INVITE USER FUNCTION ERROR ===");
-    console.error("Error type:", error.constructor.name);
-    console.error("Error message:", error.message);
-    console.error("Error stack:", error.stack);
+    console.error("Unexpected error:", error);
     return new Response(
       JSON.stringify({ 
-        success: false, 
-        error: error.message || "An unexpected error occurred",
-        errorType: error.constructor.name,
-        stack: error.stack
+        success: false,
+        error: "Internal server error", 
+        details: error instanceof Error ? error.message : "Unknown error" 
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
 });
+
+function generatePassword(): string {
+  const length = 12;
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+  let password = "";
+  const crypto = globalThis.crypto;
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  for (let i = 0; i < length; i++) {
+    password += charset[array[i] % charset.length];
+  }
+  return password;
+}
