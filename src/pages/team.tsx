@@ -135,21 +135,32 @@ export default function TeamPage() {
         role: inviteForm.role
       });
 
+      // Get the current session to include auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("No active session. Please log in again.");
+      }
+
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: {
           email: inviteForm.email,
           full_name: inviteForm.fullName,
           role: inviteForm.role
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
         }
       });
 
-      console.log("Edge Function response:", { data, error });
+      console.log("Edge Function full response:", { data, error });
 
       if (error) {
         console.error("Edge Function error details:", {
           message: error.message,
           status: error.status,
-          context: error.context
+          context: error.context,
+          name: error.name
         });
         throw error;
       }
@@ -201,11 +212,21 @@ export default function TeamPage() {
       
       console.log("Resending invite for:", member.email);
 
+      // Get the current session to include auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("No active session. Please log in again.");
+      }
+
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: {
           email: member.email,
           full_name: member.full_name,
           role: member.role
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
         }
       });
 
