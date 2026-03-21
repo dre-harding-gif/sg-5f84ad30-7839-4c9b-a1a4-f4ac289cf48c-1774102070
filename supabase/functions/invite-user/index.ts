@@ -1,68 +1,72 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
+console.log("🚀 Edge Function starting up...");
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  // Handle CORS preflight
+  console.log("📨 Request received:", req.method, req.url);
+
   if (req.method === "OPTIONS") {
+    console.log("✅ Handling CORS preflight");
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    console.log("=== Edge Function invoked ===");
-    console.log("Method:", req.method);
-    console.log("Headers:", Object.fromEntries(req.headers));
-
-    // Parse request body
-    let requestBody;
-    try {
-      const text = await req.text();
-      console.log("Raw body:", text);
-      requestBody = JSON.parse(text);
-      console.log("Parsed body:", requestBody);
-    } catch (parseError) {
-      console.error("Body parse error:", parseError);
-      return new Response(
-        JSON.stringify({ 
-          error: "Invalid JSON in request body", 
-          details: parseError instanceof Error ? parseError.message : String(parseError)
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-      );
-    }
-
-    const { email, full_name, role, phone } = requestBody;
-
-    // Validate required fields
-    if (!email || !full_name || !role) {
-      console.error("Missing required fields:", { email: !!email, full_name: !!full_name, role: !!role });
-      return new Response(
-        JSON.stringify({ error: "Email, full name, and role are required" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-      );
-    }
-
-    // Get Supabase credentials
+    console.log("🔐 Checking environment variables...");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
+    
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("Missing Supabase environment variables");
+      console.error("❌ Missing environment variables:", { 
+        hasUrl: !!supabaseUrl, 
+        hasKey: !!supabaseServiceKey 
+      });
       return new Response(
-        JSON.stringify({ error: "Server configuration error - missing credentials" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        JSON.stringify({ 
+          success: false,
+          error: "Server configuration error: Missing environment variables" 
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+          status: 500 
+        }
       );
     }
 
-    console.log("Creating Supabase client...");
+    console.log("✅ Environment variables OK");
+    console.log("📦 Creating Supabase client...");
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log("✅ Supabase client created");
+
+    console.log("📖 Reading request body...");
+    const body = await req.json();
+    console.log("📦 Request body:", JSON.stringify(body, null, 2));
+
+    const { email, full_name, role, phone } = body;
+
+    if (!email || !full_name || !role) {
+      console.error("❌ Missing required fields:", { email: !!email, full_name: !!full_name, role: !!role });
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: "Email, full name, and role are required" 
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+          status: 400 
+        }
+      );
+    }
+
+    console.log("✅ Required fields validated");
+    console.log("🔍 Checking if user already exists:", email);
 
     // Check if user already exists
-    console.log("Checking for existing profile:", email);
     const { data: existingProfile, error: profileCheckError } = await supabase
       .from("profiles")
       .select("id, email")
@@ -70,26 +74,31 @@ serve(async (req) => {
       .maybeSingle();
 
     if (profileCheckError) {
-      console.error("Profile check error:", profileCheckError);
+      console.error("❌ Error checking existing profile:", profileCheckError);
       return new Response(
         JSON.stringify({ 
-          error: "Database error checking existing user", 
+          success: false,
+          error: "Database error while checking user",
           details: profileCheckError.message 
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+          status: 500 
+        }
       );
     }
+
+    console.log("🔍 User exists check result:", existingProfile ? "EXISTS" : "NEW USER");
 
     let userId: string;
     let isNewUser = false;
     let temporaryPassword = "";
 
     if (existingProfile) {
-      console.log("Existing user found:", existingProfile.id);
+      console.log("♻️ Updating existing user:", email);
       userId = existingProfile.id;
       
-      // Update profile
-      console.log("Updating profile...");
+      // Update profile with new details
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
@@ -101,32 +110,39 @@ serve(async (req) => {
         .eq("id", userId);
 
       if (updateError) {
-        console.error("Profile update error:", updateError);
+        console.error("❌ Error updating profile:", updateError);
         return new Response(
           JSON.stringify({ 
-            error: "Failed to update user profile", 
+            success: false,
+            error: "Failed to update user profile",
             details: updateError.message 
           }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+            status: 500 
+          }
         );
       }
 
+      console.log("✅ Profile updated");
+      console.log("📧 Sending password reset email...");
+
       // Send password reset email
-      console.log("Sending password reset email...");
       const { error: resetError } = await supabase.auth.admin.inviteUserByEmail(email);
       
       if (resetError) {
-        console.error("Password reset email error:", resetError);
+        console.error("⚠️ Password reset error:", resetError);
+      } else {
+        console.log("✅ Password reset email sent");
       }
 
-      console.log("Existing user updated successfully");
     } else {
-      console.log("Creating new user...");
+      console.log("➕ Creating new user:", email);
       isNewUser = true;
       temporaryPassword = generatePassword();
+      console.log("🔑 Generated temporary password");
 
-      // Create auth user
-      console.log("Creating auth user...");
+      console.log("👤 Creating auth user...");
       const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
         email,
         password: temporaryPassword,
@@ -138,29 +154,38 @@ serve(async (req) => {
       });
 
       if (authError) {
-        console.error("Auth user creation error:", authError);
+        console.error("❌ Auth user creation error:", authError);
         return new Response(
           JSON.stringify({ 
+            success: false,
             error: "Failed to create user account", 
             details: authError.message 
           }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+            status: 400 
+          }
         );
       }
 
       if (!authUser.user) {
-        console.error("Auth user created but no user object returned");
+        console.error("❌ No user returned from auth creation");
         return new Response(
-          JSON.stringify({ error: "User creation failed - no user object" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          JSON.stringify({ 
+            success: false,
+            error: "Failed to create user account - no user data returned" 
+          }),
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+            status: 500 
+          }
         );
       }
 
       userId = authUser.user.id;
-      console.log("Auth user created:", userId);
+      console.log("✅ Auth user created:", userId);
 
-      // Create profile
-      console.log("Creating profile...");
+      console.log("👤 Creating profile...");
       const { error: profileError } = await supabase.from("profiles").insert({
         id: userId,
         email,
@@ -172,23 +197,25 @@ serve(async (req) => {
       });
 
       if (profileError) {
-        console.error("Profile creation error:", profileError);
-        // Rollback: delete auth user
-        console.log("Rolling back - deleting auth user...");
+        console.error("❌ Profile creation error:", profileError);
+        console.log("🔄 Rolling back: deleting auth user...");
         await supabase.auth.admin.deleteUser(userId);
         return new Response(
           JSON.stringify({ 
+            success: false,
             error: "Failed to create user profile", 
             details: profileError.message 
           }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+            status: 400 
+          }
         );
       }
 
-      console.log("Profile created successfully");
+      console.log("✅ Profile created successfully");
     }
 
-    // Prepare success response
     const response = {
       success: true,
       userId,
@@ -196,31 +223,37 @@ serve(async (req) => {
       isNewUser,
       temporaryPassword: isNewUser ? temporaryPassword : undefined,
       message: isNewUser 
-        ? "User created successfully! Share the temporary password securely."
+        ? "User created! Share the temporary password with them (SMTP may not be configured)."
         : "User updated and password reset email sent (if SMTP is configured)."
     };
 
-    console.log("=== Success response ===");
-    console.log(response);
+    console.log("✅ Success! Returning response:", JSON.stringify({ ...response, temporaryPassword: "***" }));
 
     return new Response(
       JSON.stringify(response),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+        status: 200 
+      }
     );
 
   } catch (error) {
-    console.error("=== UNEXPECTED ERROR ===");
-    console.error("Error type:", error?.constructor?.name);
+    console.error("💥 UNEXPECTED ERROR:", error);
+    console.error("Error type:", error.constructor.name);
     console.error("Error message:", error instanceof Error ? error.message : String(error));
     console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
     
     return new Response(
       JSON.stringify({ 
+        success: false,
         error: "Internal server error", 
-        details: error instanceof Error ? error.message : "Unknown error",
-        type: error?.constructor?.name || "UnknownError"
+        details: error instanceof Error ? error.message : String(error),
+        type: error instanceof Error ? error.constructor.name : typeof error
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+        status: 500 
+      }
     );
   }
 });
