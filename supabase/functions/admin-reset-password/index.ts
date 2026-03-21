@@ -41,22 +41,51 @@ serve(async (req) => {
       },
     });
 
-    const { userId, newPassword } = await req.json();
+    const { email, newPassword } = await req.json();
 
-    console.log("Request data:", { userId, hasPassword: !!newPassword });
+    console.log("Request data:", { email, hasPassword: !!newPassword });
 
-    if (!userId || !newPassword) {
+    if (!email || !newPassword) {
       return new Response(
-        JSON.stringify({ error: "userId and newPassword are required" }),
+        JSON.stringify({ error: "email and newPassword are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // First, find the user by email
+    console.log("Looking up user by email:", email);
+    const { data: users, error: lookupError } = await supabaseAdmin.auth.admin.listUsers();
+
+    if (lookupError) {
+      console.error("Error looking up users:", lookupError);
+      return new Response(
+        JSON.stringify({ 
+          error: "Failed to look up user",
+          details: lookupError
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const user = users.users.find(u => u.email === email);
+
+    if (!user) {
+      return new Response(
+        JSON.stringify({ 
+          error: `No user found with email: ${email}`,
+          suggestion: "Make sure the email address is correct"
+        }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Found user:", { id: user.id, email: user.email });
+
     // Reset password using admin API
-    console.log("Attempting password reset for user:", userId);
+    console.log("Attempting password reset for user:", user.id);
     
     const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
-      userId,
+      user.id,
       { password: newPassword }
     );
 
