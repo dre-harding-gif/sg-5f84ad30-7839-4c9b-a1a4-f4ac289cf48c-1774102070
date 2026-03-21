@@ -7,118 +7,127 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    console.log("🔄 Admin reset password function called");
 
-    console.log("Environment check:", {
-      hasUrl: !!supabaseUrl,
-      hasKey: !!supabaseServiceKey,
-      urlValue: supabaseUrl
-    });
+    // Get request body
+    const { email, newPassword } = await req.json();
+    console.log("📧 Email:", email);
+    console.log("🔐 Password length:", newPassword?.length);
 
-    if (!supabaseUrl || !supabaseServiceKey) {
+    // Validate inputs
+    if (!email || !newPassword) {
+      console.error("❌ Missing email or password");
       return new Response(
         JSON.stringify({ 
-          error: "Missing environment variables",
-          details: {
-            hasUrl: !!supabaseUrl,
-            hasKey: !!supabaseServiceKey
-          }
+          success: false, 
+          error: "Email and password are required" 
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get environment variables
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    console.log("🔧 Supabase URL:", supabaseUrl ? "✅ Set" : "❌ Missing");
+    console.log("🔑 Service Role Key:", serviceRoleKey ? "✅ Set" : "❌ Missing");
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("❌ Missing environment variables");
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Server configuration error: Missing Supabase credentials" 
         }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    // Create admin client
+    console.log("🔧 Creating Supabase admin client...");
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
-        persistSession: false,
-      },
+        persistSession: false
+      }
     });
 
-    const { email, newPassword } = await req.json();
-
-    console.log("Request data:", { email, hasPassword: !!newPassword });
-
-    if (!email || !newPassword) {
-      return new Response(
-        JSON.stringify({ error: "email and newPassword are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // First, find the user by email
-    console.log("Looking up user by email:", email);
-    const { data: users, error: lookupError } = await supabaseAdmin.auth.admin.listUsers();
-
-    if (lookupError) {
-      console.error("Error looking up users:", lookupError);
+    // Look up user by email
+    console.log("🔍 Looking up user by email...");
+    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (listError) {
+      console.error("❌ Error listing users:", listError);
       return new Response(
         JSON.stringify({ 
-          error: "Failed to look up user",
-          details: lookupError
+          success: false, 
+          error: `Failed to list users: ${listError.message}` 
         }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const user = users.users.find(u => u.email === email);
-
+    
     if (!user) {
+      console.error("❌ User not found:", email);
       return new Response(
         JSON.stringify({ 
-          error: `No user found with email: ${email}`,
-          suggestion: "Make sure the email address is correct"
+          success: false, 
+          error: `User not found: ${email}` 
         }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Found user:", { id: user.id, email: user.email });
+    console.log("✅ User found:", user.id);
 
-    // Reset password using admin API
-    console.log("Attempting password reset for user:", user.id);
-    
-    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
+    // Update user password
+    console.log("🔄 Updating password...");
+    const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       user.id,
       { password: newPassword }
     );
 
-    console.log("Admin API response:", { 
-      success: !!data, 
-      error: error?.message,
-      errorDetails: error
-    });
-
-    if (error) {
+    if (updateError) {
+      console.error("❌ Error updating password:", updateError);
       return new Response(
         JSON.stringify({ 
-          error: error.message,
-          details: error
+          success: false, 
+          error: `Failed to update password: ${updateError.message}` 
         }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    console.log("✅ Password updated successfully!");
+
     return new Response(
       JSON.stringify({ 
-        success: true, 
-        message: "Password reset successfully",
-        user: { id: data.user.id, email: data.user.email }
+        success: true,
+        message: "Password reset successful",
+        user: {
+          id: user.id,
+          email: user.email
+        }
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
-    console.error("Function error:", error);
+
+  } catch (err) {
+    console.error("❌ Unexpected error:", err);
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Unknown error",
-        stack: error.stack
+        success: false, 
+        error: err.message || "An unexpected error occurred",
+        details: err.toString()
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
