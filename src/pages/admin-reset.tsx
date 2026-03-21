@@ -23,40 +23,50 @@ export default function AdminResetPage() {
     setLoading(true);
 
     try {
-      console.log("🔄 Calling admin-reset-password function...");
+      console.log("🔄 Looking up user by email...");
       console.log("📧 Email:", email);
-      console.log("🔐 Password length:", newPassword.length);
       
-      // First, test the basic function
-      console.log("🧪 Testing basic Edge Function connection...");
-      const { data: testData, error: testError } = await supabase.functions.invoke('test-admin-reset', {
-        body: { test: true }
-      });
-      console.log("🧪 Test function response:", { testData, testError });
+      // First, get the user ID from email using Supabase client
+      const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
       
-      if (testError) {
-        console.error("❌ Test function failed:", testError);
-        throw new Error(`Test function failed: ${testError.message}\n\nThis means Edge Functions aren't working. Please check your Supabase configuration.`);
-      }
-      
-      console.log("✅ Test function succeeded! Now calling actual reset function...");
-      
-      const { data, error: fnError } = await supabase.functions.invoke('admin-reset-password', {
-        body: { email, newPassword }
-      });
-
-      console.log("📨 Function response:", { data, error: fnError });
-
-      if (fnError) {
-        console.error("❌ Function error:", fnError);
-        // Show the actual error details
-        const errorDetails = JSON.stringify(fnError, null, 2);
-        throw new Error(`Function error: ${fnError.message}\n\nDetails: ${errorDetails}`);
+      if (listError) {
+        console.error("❌ Failed to list users:", listError);
+        throw new Error(`Failed to lookup user: ${listError.message}`);
       }
 
-      if (!data?.success) {
-        console.error("❌ Reset failed:", data?.error);
-        throw new Error(data?.error || "Password reset failed");
+      const user = users?.find(u => u.email === email);
+      
+      if (!user) {
+        console.error("❌ User not found:", email);
+        throw new Error(`No user found with email: ${email}`);
+      }
+
+      console.log("✅ User found:", user.id);
+      console.log("🔐 Resetting password via API route...");
+
+      // Call our Next.js API route to reset the password
+      const response = await fetch('/api/reset-user-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          newPassword
+        }),
+      });
+
+      const data = await response.json();
+      console.log("📨 API response:", { status: response.status, data });
+
+      if (!response.ok) {
+        console.error("❌ API error:", data);
+        throw new Error(data.error || data.details || "Failed to reset password");
+      }
+
+      if (!data.success) {
+        console.error("❌ Reset failed:", data.error);
+        throw new Error(data.error || "Password reset failed");
       }
 
       console.log("✅ Password reset successful!");
