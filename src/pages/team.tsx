@@ -70,6 +70,40 @@ export default function TeamPage() {
   const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Add test connection function
+  async function testEdgeFunctionConnection() {
+    try {
+      console.log("🧪 Testing Edge Function connection...");
+      
+      const { data, error } = await supabase.functions.invoke('test-connection', {
+        body: { test: true }
+      });
+
+      console.log("🧪 Test result:", { data, error });
+
+      if (error) {
+        toast({
+          title: "❌ Connection Test Failed",
+          description: `Error: ${error.message}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "✅ Connection Test Successful!",
+        description: `Response: ${JSON.stringify(data)}`
+      });
+    } catch (err: any) {
+      console.error("🧪 Test error:", err);
+      toast({
+        title: "❌ Test Error",
+        description: err.message,
+        variant: "destructive"
+      });
+    }
+  }
+
   useEffect(() => {
     fetchTeamMembers();
     fetchUserRole();
