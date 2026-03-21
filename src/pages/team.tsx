@@ -129,6 +129,12 @@ export default function TeamPage() {
     setInviting(true);
     
     try {
+      console.log("Invoking invite-user function with:", {
+        email: inviteForm.email,
+        full_name: inviteForm.fullName,
+        role: inviteForm.role
+      });
+
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: {
           email: inviteForm.email,
@@ -137,16 +143,22 @@ export default function TeamPage() {
         }
       });
 
+      console.log("Edge Function response:", { data, error });
+
       if (error) {
-        console.error("Edge Function error:", error);
+        console.error("Edge Function error details:", {
+          message: error.message,
+          status: error.status,
+          context: error.context
+        });
         throw error;
       }
 
-      if (!data.success) {
-        throw new Error(data.error || "Failed to send invitation");
+      if (!data?.success) {
+        throw new Error(data?.error || "Failed to send invitation");
       }
 
-      // Show success based on whether it's a new user and if email was sent
+      // Show success based on whether it's a new user
       if (data.isNewUser) {
         setInvitedCredentials({
           email: inviteForm.email,
@@ -172,10 +184,10 @@ export default function TeamPage() {
       fetchTeamMembers();
 
     } catch (error: any) {
-      console.error("Invitation error:", error);
+      console.error("Full invitation error:", error);
       toast({
         title: "Invitation Failed",
-        description: error.message || "Failed to send invitation. Check console for details.",
+        description: error.message || "Failed to send invitation. Check browser console for details.",
         variant: "destructive"
       });
     } finally {
@@ -187,6 +199,8 @@ export default function TeamPage() {
     try {
       setResending(member.id);
       
+      console.log("Resending invite for:", member.email);
+
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: {
           email: member.email,
@@ -194,6 +208,8 @@ export default function TeamPage() {
           role: member.role
         }
       });
+
+      console.log("Resend response:", { data, error });
 
       if (error) {
         console.error('Edge Function error:', error);
@@ -205,10 +221,10 @@ export default function TeamPage() {
         return;
       }
 
-      if (!data.success) {
+      if (!data?.success) {
         toast({
           title: "Error",
-          description: data.error || "Failed to resend invitation",
+          description: data?.error || "Failed to resend invitation",
           variant: "destructive",
         });
         return;
