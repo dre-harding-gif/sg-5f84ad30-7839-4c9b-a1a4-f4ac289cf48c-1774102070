@@ -15,25 +15,6 @@ export default function AdminResetPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [users, setUsers] = useState<Array<{email: string, full_name: string, role: string}>>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-
-  const loadUsers = async () => {
-    setLoadingUsers(true);
-    try {
-      const { data, error: fetchError } = await supabase
-        .from("profiles")
-        .select("email, full_name, role")
-        .order("created_at", { ascending: true });
-
-      if (fetchError) throw fetchError;
-      setUsers(data || []);
-    } catch (err: any) {
-      console.error("Error loading users:", err);
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +24,8 @@ export default function AdminResetPage() {
 
     try {
       console.log("🔄 Calling admin-reset-password function...");
+      console.log("📧 Email:", email);
+      console.log("🔐 Password length:", newPassword.length);
       
       const { data, error: fnError } = await supabase.functions.invoke('admin-reset-password', {
         body: { email, newPassword }
@@ -51,13 +34,16 @@ export default function AdminResetPage() {
       console.log("📨 Function response:", { data, error: fnError });
 
       if (fnError) {
+        console.error("❌ Function error:", fnError);
         throw new Error(fnError.message || "Failed to reset password");
       }
 
       if (!data?.success) {
+        console.error("❌ Reset failed:", data?.error);
         throw new Error(data?.error || "Password reset failed");
       }
 
+      console.log("✅ Password reset successful!");
       setSuccess(true);
       setEmail("");
       setNewPassword("");
@@ -78,65 +64,18 @@ export default function AdminResetPage() {
       />
       
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-orange-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl space-y-6">
-          {/* Header */}
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-500 rounded-2xl shadow-lg mb-4">
-              <Shield className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-3xl font-bold text-slate-900">Admin Password Reset</h1>
-            <p className="text-slate-600 mt-2">Reset passwords for any team member</p>
-          </div>
-
-          {/* Quick Access: Load Users */}
+        <div className="w-full max-w-md">
           <Card className="shadow-xl border-slate-200">
-            <CardHeader>
-              <CardTitle className="text-lg">Quick Access - Team Members</CardTitle>
-              <CardDescription>Click to load all team members and their emails</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                onClick={loadUsers}
-                disabled={loadingUsers}
-                variant="outline"
-                className="w-full"
-              >
-                {loadingUsers ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading Users...
-                  </>
-                ) : (
-                  <>Load Team Members</>
-                )}
-              </Button>
-
-              {users.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-sm font-medium text-slate-700">Click an email to auto-fill:</p>
-                  <div className="space-y-1 max-h-60 overflow-y-auto">
-                    {users.map((user) => (
-                      <button
-                        key={user.email}
-                        onClick={() => setEmail(user.email)}
-                        className="w-full text-left p-3 rounded-lg border hover:bg-slate-50 transition-colors"
-                      >
-                        <div className="font-medium text-slate-900">{user.full_name}</div>
-                        <div className="text-sm text-slate-600">{user.email}</div>
-                        <div className="text-xs text-slate-500 mt-1">Role: {user.role}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Reset Form */}
-          <Card className="shadow-xl border-slate-200">
-            <CardHeader>
-              <CardTitle>Reset Password</CardTitle>
-              <CardDescription>Enter email and new password for the user</CardDescription>
+            <CardHeader className="text-center space-y-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-500 rounded-2xl shadow-lg mx-auto">
+                <Shield className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">Admin Password Reset</CardTitle>
+                <CardDescription className="mt-2">
+                  Reset passwords for any team member
+                </CardDescription>
+              </div>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleReset} className="space-y-4">
@@ -144,7 +83,7 @@ export default function AdminResetPage() {
                   <Alert className="bg-green-50 border-green-200">
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                     <AlertDescription className="text-green-800">
-                      ✅ Password reset successful! The user can now log in with the new password.
+                      ✅ Password reset successful! User can now log in with the new password.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -217,56 +156,59 @@ export default function AdminResetPage() {
                   )}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
 
-          {/* Quick Presets */}
-          <Card className="shadow-xl border-orange-200 bg-orange-50">
-            <CardHeader>
-              <CardTitle className="text-sm">⚡ Quick Reset Presets</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEmail("dre-harding@hardinghomes.info");
-                    setNewPassword("Harding2026!");
-                  }}
-                  className="text-left justify-start"
-                >
-                  <div>
-                    <div className="font-medium">Dre Harding (Owner)</div>
-                    <div className="text-xs text-slate-600">dre-harding@hardinghomes.info</div>
-                  </div>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEmail("admin@hardinghamhomes.com");
-                    setNewPassword("Admin2026!");
-                  }}
-                  className="text-left justify-start"
-                >
-                  <div>
-                    <div className="font-medium">Admin (Office Manager)</div>
-                    <div className="text-xs text-slate-600">admin@hardinghamhomes.com</div>
-                  </div>
-                </Button>
+              {/* Quick Presets */}
+              <div className="mt-6 pt-6 border-t border-slate-200">
+                <p className="text-sm font-medium text-slate-700 mb-3">⚡ Quick Presets:</p>
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEmail("dre-harding@hardinghomes.info");
+                      setNewPassword("Harding2026!");
+                    }}
+                    className="w-full justify-start text-left"
+                    type="button"
+                  >
+                    <div className="text-left">
+                      <div className="font-medium">Dre Harding (Owner)</div>
+                      <div className="text-xs text-slate-600">dre-harding@hardinghomes.info</div>
+                      <div className="text-xs text-orange-600">Password: Harding2026!</div>
+                    </div>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEmail("admin@hardinghamhomes.com");
+                      setNewPassword("Admin2026!");
+                    }}
+                    className="w-full justify-start text-left"
+                    type="button"
+                  >
+                    <div className="text-left">
+                      <div className="font-medium">Admin (Office Manager)</div>
+                      <div className="text-xs text-slate-600">admin@hardinghamhomes.com</div>
+                      <div className="text-xs text-orange-600">Password: Admin2026!</div>
+                    </div>
+                  </Button>
+                </div>
+                <p className="text-xs text-orange-700 mt-3">
+                  💡 Click a preset to auto-fill, then click "Reset Password"
+                </p>
               </div>
-              <p className="text-xs text-orange-700 mt-2">
-                💡 Click a preset to auto-fill email and suggested password
-              </p>
+
+              {/* Security Note */}
+              <div className="mt-6 pt-6 border-t border-slate-200 text-center text-xs text-slate-500 space-y-1">
+                <p>⚠️ This is a powerful admin tool. Use responsibly.</p>
+                <p>Always ask users to change their password after reset.</p>
+                <p className="pt-2 text-slate-600 font-medium">
+                  📝 After resetting, tell users to log in at: /staff-login
+                </p>
+              </div>
             </CardContent>
           </Card>
-
-          {/* Security Note */}
-          <div className="text-center text-xs text-slate-500 space-y-1">
-            <p>⚠️ This is a powerful admin tool. Use responsibly.</p>
-            <p>Always ask users to change their password after reset.</p>
-          </div>
         </div>
       </div>
     </>
