@@ -35,7 +35,9 @@ export default function AdminResetPage() {
 
       if (fnError) {
         console.error("❌ Function error:", fnError);
-        throw new Error(fnError.message || "Failed to reset password");
+        // Show the actual error details
+        const errorDetails = JSON.stringify(fnError, null, 2);
+        throw new Error(`Function error: ${fnError.message}\n\nDetails: ${errorDetails}`);
       }
 
       if (!data?.success) {
