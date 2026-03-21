@@ -27,6 +27,20 @@ export default function AdminResetPage() {
       console.log("📧 Email:", email);
       console.log("🔐 Password length:", newPassword.length);
       
+      // First, test the basic function
+      console.log("🧪 Testing basic Edge Function connection...");
+      const { data: testData, error: testError } = await supabase.functions.invoke('test-admin-reset', {
+        body: { test: true }
+      });
+      console.log("🧪 Test function response:", { testData, testError });
+      
+      if (testError) {
+        console.error("❌ Test function failed:", testError);
+        throw new Error(`Test function failed: ${testError.message}\n\nThis means Edge Functions aren't working. Please check your Supabase configuration.`);
+      }
+      
+      console.log("✅ Test function succeeded! Now calling actual reset function...");
+      
       const { data, error: fnError } = await supabase.functions.invoke('admin-reset-password', {
         body: { email, newPassword }
       });
