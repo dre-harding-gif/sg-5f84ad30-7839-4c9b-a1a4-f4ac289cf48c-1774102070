@@ -13,31 +13,24 @@ serve(async (req) => {
   }
 
   try {
-    console.log("=== Invite User Function Started ===");
-    
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("Missing environment variables");
-      return new Response(
-        JSON.stringify({ error: "Server configuration error" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log("=== Edge Function invoked ===");
+    console.log("Method:", req.method);
+    console.log("Headers:", Object.fromEntries(req.headers));
 
     // Parse request body
     let requestBody;
     try {
-      requestBody = await req.json();
-      console.log("Request body:", JSON.stringify(requestBody, null, 2));
+      const text = await req.text();
+      console.log("Raw body:", text);
+      requestBody = JSON.parse(text);
+      console.log("Parsed body:", requestBody);
     } catch (parseError) {
-      console.error("JSON parse error:", parseError);
+      console.error("Body parse error:", parseError);
       return new Response(
-        JSON.stringify({ error: "Invalid JSON in request body" }),
+        JSON.stringify({ 
+          error: "Invalid JSON in request body", 
+          details: parseError instanceof Error ? parseError.message : String(parseError)
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
@@ -53,9 +46,23 @@ serve(async (req) => {
       );
     }
 
-    console.log("Processing invite for:", email);
+    // Get Supabase credentials
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Missing Supabase environment variables");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error - missing credentials" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
+    console.log("Creating Supabase client...");
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Check if user already exists
+    console.log("Checking for existing profile:", email);
     const { data: existingProfile, error: profileCheckError } = await supabase
       .from("profiles")
       .select("id, email")
@@ -65,7 +72,10 @@ serve(async (req) => {
     if (profileCheckError) {
       console.error("Profile check error:", profileCheckError);
       return new Response(
-        JSON.stringify({ error: "Database error checking existing user" }),
+        JSON.stringify({ 
+          error: "Database error checking existing user", 
+          details: profileCheckError.message 
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
@@ -75,10 +85,11 @@ serve(async (req) => {
     let temporaryPassword = "";
 
     if (existingProfile) {
-      console.log("User exists, updating profile:", existingProfile.id);
+      console.log("Existing user found:", existingProfile.id);
       userId = existingProfile.id;
       
-      // Update profile with new details
+      // Update profile
+      console.log("Updating profile...");
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
@@ -92,26 +103,30 @@ serve(async (req) => {
       if (updateError) {
         console.error("Profile update error:", updateError);
         return new Response(
-          JSON.stringify({ error: "Failed to update user profile" }),
+          JSON.stringify({ 
+            error: "Failed to update user profile", 
+            details: updateError.message 
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
 
-      // Send password reset email (will use SMTP if configured)
+      // Send password reset email
+      console.log("Sending password reset email...");
       const { error: resetError } = await supabase.auth.admin.inviteUserByEmail(email);
       
       if (resetError) {
-        console.error("Password reset error:", resetError);
-        // Don't fail the whole operation if email fails
+        console.error("Password reset email error:", resetError);
       }
 
-      console.log("Updated existing user:", email);
+      console.log("Existing user updated successfully");
     } else {
-      console.log("Creating new user:", email);
+      console.log("Creating new user...");
       isNewUser = true;
       temporaryPassword = generatePassword();
 
-      // Create new auth user
+      // Create auth user
+      console.log("Creating auth user...");
       const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
         email,
         password: temporaryPassword,
@@ -134,9 +149,9 @@ serve(async (req) => {
       }
 
       if (!authUser.user) {
-        console.error("No user returned from createUser");
+        console.error("Auth user created but no user object returned");
         return new Response(
-          JSON.stringify({ error: "Failed to create user account" }),
+          JSON.stringify({ error: "User creation failed - no user object" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
@@ -145,6 +160,7 @@ serve(async (req) => {
       console.log("Auth user created:", userId);
 
       // Create profile
+      console.log("Creating profile...");
       const { error: profileError } = await supabase.from("profiles").insert({
         id: userId,
         email,
@@ -158,6 +174,7 @@ serve(async (req) => {
       if (profileError) {
         console.error("Profile creation error:", profileError);
         // Rollback: delete auth user
+        console.log("Rolling back - deleting auth user...");
         await supabase.auth.admin.deleteUser(userId);
         return new Response(
           JSON.stringify({ 
@@ -168,42 +185,40 @@ serve(async (req) => {
         );
       }
 
-      console.log("Profile created for:", email);
+      console.log("Profile created successfully");
     }
 
     // Prepare success response
-    const response: any = {
+    const response = {
       success: true,
       userId,
       email,
       isNewUser,
+      temporaryPassword: isNewUser ? temporaryPassword : undefined,
+      message: isNewUser 
+        ? "User created successfully! Share the temporary password securely."
+        : "User updated and password reset email sent (if SMTP is configured)."
     };
 
-    if (isNewUser) {
-      response.temporaryPassword = temporaryPassword;
-      response.message = "User created successfully! Share the temporary password with them.";
-      response.emailSent = false; // We're returning the password, not sending email
-    } else {
-      response.message = "User updated and password reset email sent (if SMTP configured).";
-      response.emailSent = true; // Attempted to send email
-    }
+    console.log("=== Success response ===");
+    console.log(response);
 
-    console.log("=== Invite User Function Completed Successfully ===");
-    
     return new Response(
       JSON.stringify(response),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
 
   } catch (error) {
-    console.error("=== Unexpected Error ===");
-    console.error("Error:", error);
-    console.error("Stack:", error instanceof Error ? error.stack : "No stack trace");
+    console.error("=== UNEXPECTED ERROR ===");
+    console.error("Error type:", error?.constructor?.name);
+    console.error("Error message:", error instanceof Error ? error.message : String(error));
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
     
     return new Response(
       JSON.stringify({ 
         error: "Internal server error", 
-        details: error instanceof Error ? error.message : "Unknown error" 
+        details: error instanceof Error ? error.message : "Unknown error",
+        type: error?.constructor?.name || "UnknownError"
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
