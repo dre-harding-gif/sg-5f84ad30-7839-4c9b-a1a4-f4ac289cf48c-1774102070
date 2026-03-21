@@ -10,16 +10,16 @@ import { SEO } from "@/components/SEO";
 export default function AdminResetPage() {
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorDetails, setErrorDetails] = useState<any>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(false);
-    setLoading(true);
+    setIsLoading(true);
+    setSuccessMessage("");
+    setErrorDetails(null);
 
     try {
       console.log("🔐 Sending reset request for:", email);
@@ -41,24 +41,28 @@ export default function AdminResetPage() {
 
       if (!response.ok) {
         console.error("❌ API error:", data);
-        throw new Error(data.error || data.details || "Failed to reset password");
+        console.error("❌ Full error details:", JSON.stringify(data, null, 2));
+        setErrorDetails(data);
+        setIsLoading(false);
+        return; // Don't throw - let the error display show
       }
 
       if (!data.success) {
-        console.error("❌ Reset failed:", data.error);
-        throw new Error(data.error || "Password reset failed");
+        setErrorDetails(data);
+        setIsLoading(false);
+        return;
       }
 
       console.log("✅ Password reset successful!");
-      setSuccess(true);
+      setSuccessMessage("✅ Password reset successful! User can now log in with the new password.");
       setEmail("");
       setNewPassword("");
       
     } catch (err: any) {
       console.error("❌ Reset error:", err);
-      setError(err.message || "Failed to reset password. Please try again.");
+      setErrorDetails(err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -85,19 +89,19 @@ export default function AdminResetPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleReset} className="space-y-4">
-                {success && (
+                {successMessage && (
                   <Alert className="bg-green-50 border-green-200">
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                     <AlertDescription className="text-green-800">
-                      ✅ Password reset successful! User can now log in with the new password.
+                      {successMessage}
                     </AlertDescription>
                   </Alert>
                 )}
 
-                {error && (
+                {errorDetails && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
+                    <AlertDescription>{errorDetails.message || "Failed to reset password. Please try again."}</AlertDescription>
                   </Alert>
                 )}
 
@@ -110,7 +114,7 @@ export default function AdminResetPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    disabled={loading}
+                    disabled={isLoading}
                     className="h-11"
                   />
                   <p className="text-xs text-slate-500">
@@ -128,7 +132,7 @@ export default function AdminResetPage() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       required
-                      disabled={loading}
+                      disabled={isLoading}
                       className="h-11 pr-10"
                     />
                     <button
@@ -147,9 +151,9 @@ export default function AdminResetPage() {
                 <Button
                   type="submit"
                   className="w-full h-11 text-base bg-orange-500 hover:bg-orange-600"
-                  disabled={loading}
+                  disabled={isLoading}
                 >
-                  {loading ? (
+                  {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Resetting Password...
@@ -162,6 +166,15 @@ export default function AdminResetPage() {
                   )}
                 </Button>
               </form>
+
+              {errorDetails && (
+                <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <h3 className="font-semibold text-red-900 mb-2">🔍 Detailed Error Information:</h3>
+                  <pre className="text-xs text-red-800 overflow-auto max-h-96 whitespace-pre-wrap">
+                    {JSON.stringify(errorDetails, null, 2)}
+                  </pre>
+                </div>
+              )}
 
               {/* Quick Presets */}
               <div className="mt-6 pt-6 border-t border-slate-200">

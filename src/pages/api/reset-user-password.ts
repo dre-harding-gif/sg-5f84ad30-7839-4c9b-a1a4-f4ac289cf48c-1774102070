@@ -25,11 +25,29 @@ export default async function handler(
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+    console.log("API: Environment check:", {
+      hasUrl: !!supabaseUrl,
+      hasServiceKey: !!serviceRoleKey,
+      urlValue: supabaseUrl,
+      serviceKeyLength: serviceRoleKey?.length,
+      serviceKeyPrefix: serviceRoleKey?.substring(0, 50) + "...",
+      serviceKeyEndsWidth: "..." + serviceRoleKey?.substring(serviceRoleKey.length - 20)
+    });
+
     if (!supabaseUrl || !serviceRoleKey) {
       console.error("API: Missing Supabase configuration");
       return res.status(500).json({ 
         error: "Server configuration error",
         details: "Missing Supabase URL or SUPABASE_SERVICE_ROLE_KEY in environment variables."
+      });
+    }
+
+    // Verify the service role key format
+    if (!serviceRoleKey.startsWith("eyJ")) {
+      console.error("API: Service role key doesn't look like a JWT");
+      return res.status(500).json({
+        error: "Invalid service role key format",
+        details: "Service role key should be a JWT starting with 'eyJ'"
       });
     }
 
@@ -41,14 +59,37 @@ export default async function handler(
       }
     });
 
+    console.log("API: Created Supabase admin client");
+
     // 1. Look up user by email securely on the server
+    console.log("API: Listing users to find:", email);
     const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
     
+    console.log("API: List users result:", {
+      success: !listError,
+      userCount: users?.length,
+      error: listError ? {
+        message: listError.message,
+        status: listError.status,
+        name: listError.name
+      } : null
+    });
+
     if (listError) {
-      console.error("API: Failed to list users", listError);
+      console.error("API: Failed to list users", {
+        message: listError.message,
+        status: listError.status,
+        name: listError.name,
+        code: (listError as any).code
+      });
       return res.status(500).json({ 
         error: "Failed to look up user", 
-        details: listError.message 
+        details: `Supabase error: ${listError.message}`,
+        supabaseError: {
+          message: listError.message,
+          status: listError.status,
+          name: listError.name
+        }
       });
     }
 
@@ -56,22 +97,33 @@ export default async function handler(
 
     if (!user) {
       console.error("API: User not found for email:", email);
+      console.log("API: Available users:", users.map(u => ({ id: u.id, email: u.email })));
       return res.status(404).json({ error: `No user found with email: ${email}` });
     }
 
     console.log("API: Found user ID:", user.id);
 
     // 2. Update the password using Admin API
+    console.log("API: Updating password for user:", user.id);
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       user.id,
       { password: newPassword }
     );
 
     if (updateError) {
-      console.error("API: Failed to update password", updateError);
+      console.error("API: Failed to update password", {
+        message: updateError.message,
+        status: updateError.status,
+        name: updateError.name
+      });
       return res.status(500).json({ 
         error: "Failed to reset password", 
-        details: updateError.message 
+        details: `Supabase error: ${updateError.message}`,
+        supabaseError: {
+          message: updateError.message,
+          status: updateError.status,
+          name: updateError.name
+        }
       });
     }
 
