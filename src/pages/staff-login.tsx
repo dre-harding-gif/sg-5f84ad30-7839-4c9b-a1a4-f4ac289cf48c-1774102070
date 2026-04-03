@@ -99,13 +99,13 @@ export default function StaffLogin() {
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-lg mb-4">
+            <div className="inline-flex items-center justify-center bg-black p-4 rounded-2xl shadow-lg mb-4">
               <Image
                 src="/harding-homes-logo.jpg"
                 alt="Harding Homes"
-                width={64}
-                height={64}
-                className="rounded-xl"
+                width={200}
+                height={60}
+                className="h-16 w-auto object-contain"
               />
             </div>
             <h1 className="text-3xl font-bold text-slate-900">Harding Homes</h1>

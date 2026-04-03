@@ -279,8 +279,8 @@ export default function CustomerPortal() {
                 <Image 
                   src="/harding-homes-logo.jpg" 
                   alt="Harding Homes" 
-                  width={160} 
-                  height={40}
+                  width={200} 
+                  height={60}
                   className="h-12 w-auto object-contain rounded-sm"
                 />
               </div>

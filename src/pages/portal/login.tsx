@@ -86,9 +86,9 @@ export default function CustomerLogin() {
             <Image 
               src="/harding-homes-logo.jpg" 
               alt="Harding Homes" 
-              width={200} 
-              height={60}
-              className="h-16 w-auto object-contain"
+              width={280} 
+              height={100}
+              className="h-20 w-auto object-contain"
             />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Customer Portal</h1>
