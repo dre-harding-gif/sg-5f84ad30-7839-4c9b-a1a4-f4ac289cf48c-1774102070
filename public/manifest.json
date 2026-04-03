@@ -4,7 +4,7 @@
   "description": "Professional building project management for Harding Homes Ltd",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1e3a8a",
+  "background_color": "#000000",
   "theme_color": "#1e3a8a",
   "orientation": "portrait-primary",
   "icons": [
