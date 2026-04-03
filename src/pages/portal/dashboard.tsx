@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Calendar, MapPin, Users, FileText, MessageSquare, 
   Download, LogOut, CheckCircle, Clock, AlertCircle,
-  Image as ImageIcon, Send, Timer, Wrench
+  Image as ImageIcon, Send, Timer, Wrench, Home, Camera, Eye
 } from "lucide-react";
 import { format } from "date-fns";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
@@ -708,6 +708,51 @@ export default function CustomerPortal() {
               </Card>
             )}
           </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-blue-200" onClick={() => router.push("/portal/project-status")}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 p-3 rounded-full">
+                  <Camera className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Project Status</CardTitle>
+                  <CardDescription>View construction updates & photos</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-slate-600">Track your project progress with real-time updates and photo galleries from our team.</p>
+              <Button variant="ghost" className="mt-3 w-full justify-between group">
+                View Project Status
+                <Eye className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-blue-200" onClick={() => router.push("/portal/maintenance")}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <div className="bg-orange-100 p-3 rounded-full">
+                  <Wrench className="h-6 w-6 text-orange-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Maintenance Requests</CardTitle>
+                  <CardDescription>Submit and track service requests</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-slate-600">Need assistance? Submit a maintenance request and we'll get back to you promptly.</p>
+              <Button variant="ghost" className="mt-3 w-full justify-between group">
+                Submit Request
+                <MessageSquare className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
