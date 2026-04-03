@@ -16,6 +16,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
 
 interface TodayJob {
   id: string;
@@ -331,6 +332,30 @@ export default function Dashboard() {
     <DashboardLayout>
       <SEO title="Dashboard - Harding Homes" />
       
+      {/* Hero Section */}
+      <section className="relative min-h-[600px] flex items-center justify-center overflow-hidden bg-gradient-hero text-white">
+        <div className="absolute inset-0 bg-[url('/hero-pattern.svg')] opacity-10"></div>
+        
+        <div className="container relative z-10 mx-auto px-4 py-20 text-center">
+          <div className="mb-8 inline-block bg-black/30 backdrop-blur-sm p-6 rounded-3xl shadow-2xl border border-white/10">
+            <Image 
+              src="/harding-homes-logo.jpg" 
+              alt="Harding Homes" 
+              width={400}
+              height={120}
+              className="h-24 w-auto object-contain mx-auto"
+              priority
+            />
+          </div>
+          
+          <h1 className="mb-6 text-5xl font-bold leading-tight md:text-6xl lg:text-7xl">
+            Building Excellence,
+            <br />
+            <span className="text-blue-200">Preserving Heritage</span>
+          </h1>
+        </div>
+      </section>
+
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>

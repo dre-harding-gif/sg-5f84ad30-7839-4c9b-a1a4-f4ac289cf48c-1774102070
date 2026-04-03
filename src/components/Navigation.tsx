@@ -1,10 +1,11 @@
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/router";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { 
   LayoutDashboard, Users, Briefcase, Calendar, 
   FileText, Settings, TrendingUp, Building, 
-  Package, Clock, DollarSign, Home, UserPlus, Shield, CalendarDays, Building2, BarChart3, Calculator, User
+  Package, Clock, DollarSign, Home, UserPlus, Shield, CalendarDays, Building2, BarChart3, Calculator, User, Truck, ShoppingCart, UserCircle, Headphones
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,10 +38,14 @@ function NavigationContent({ onItemClick }: { onItemClick?: () => void }) {
     <>
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2">
-          <Building className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="font-bold text-lg text-foreground">Harding Homes</h1>
-            <p className="text-xs text-muted-foreground">Job Management</p>
+          <div className="bg-black p-1.5 rounded-lg">
+            <Image 
+              src="/harding-homes-logo.jpg" 
+              alt="Harding Homes" 
+              width={140}
+              height={42}
+              className="h-9 w-auto object-contain"
+            />
           </div>
         </div>
       </div>
